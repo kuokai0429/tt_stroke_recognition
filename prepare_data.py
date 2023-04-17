@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
         print("Mode: annotation")
 
-        # Stroke Classes: {0: "其他", 1: "發球", 2: "正手推球", 3: "反手推球", 4: "正手切球", 5: "反手切球"}
+        # Stroke Classes: {0: "其他", 1: "正手發球", 2: "反手發球", 3: "正手推球", 4: "反手推球", 5: "正手切球", 6: "反手切球"}
 
         # (X_All, y_All) = prepareData()
         # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
