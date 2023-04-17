@@ -1,0 +1,10 @@
+
+# Prepare Data
+python preapare_data.py --mode video
+( python preapare_data.py --mode annotation )
+
+# Train
+python run.py --mode train
+
+# Inference
+python run.py --mode evaluate
