@@ -99,7 +99,7 @@ def videoCrop(filepath, filename, output_directory):
             
             first_access = False
             area = cv2.selectROI('videoCrop', frame, showCrosshair=False, fromCenter=False)
-            out = cv2.VideoWriter(f'{output_directory}/{filename}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
+            out = cv2.VideoWriter(f'{output_directory}/cropped_{filename}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
                 fps, (area[2], area[3]))
 
             print("\nPress 'q' to exit!")
@@ -110,8 +110,8 @@ def videoCrop(filepath, filename, output_directory):
             print("Exit video!")
             break
         
-        # cv2.rectangle(frame, area, (255, 255, 255), 3)
-        # cv2.imshow('videoCrop', frame)
+        cv2.rectangle(frame, area, (255, 255, 255), 3)
+        cv2.imshow('videoCrop', frame)
 
         frame_cropped = frame[int(area[1]):int(area[1]+area[3]), 
             int(area[0]):int(area[0]+area[2])] if any(area) > 0 else frame.copy()
@@ -122,8 +122,6 @@ def videoCrop(filepath, filename, output_directory):
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-
-    return f'{output_directory}/{filename}.mp4'
 
 
 def getVideoInfo(filepath):
@@ -140,7 +138,7 @@ def videoFrame(file, folder):
     print("Start adding frame!\n")
     
     cap = cv2.VideoCapture(f"{folder}{file}.mp4")
-    output = cv2.VideoWriter(f'{folder}result_{file}.mp4', cv2.VideoWriter_fourcc('m','p','4','v'), 
+    output = cv2.VideoWriter(f'{folder}result_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
                              float(30), (int(cap.get(3)), int(cap.get(4))))
 
     count = 0
@@ -170,7 +168,7 @@ if __name__ == "__main__":
 
         folder = ".\\input\\"
 
-        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
+        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[2:]:
     
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
@@ -179,18 +177,20 @@ if __name__ == "__main__":
 
             print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
 
-            # Convert video to mp4
-            os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
+            # # Convert video to mp4
+            # os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
             
-            # Add frame
-            videoFrame(f"{firstletter.lower()}{fileID}", folder)
+            # # Add frame
+            # videoFrame(f"{firstletter.lower()}{fileID}", folder)
 
             # Crop video
-            # videoCrop()
+            videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
 
     elif args.mode == "annotation":
 
         print("Mode: annotation")
+
+        # Stroke Classes: {0: "其他", 1: "發球", 2: "正手推球", 3: "反手推球", 4: "正手切球", 5: "反手切球"}
 
         # (X_All, y_All) = prepareData()
         # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
