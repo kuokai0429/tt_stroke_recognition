@@ -141,7 +141,7 @@ def videoFrame(file, folder):
     
     cap = cv2.VideoCapture(f"{folder}{file}.mp4")
     output = cv2.VideoWriter(f'{folder}result_{file}.mp4', cv2.VideoWriter_fourcc('m','p','4','v'), 
-                             float(20), (int(cap.get(3)), int(cap.get(4))))
+                             float(30), (int(cap.get(3)), int(cap.get(4))))
 
     count = 0
     while(cap.isOpened()):
@@ -160,6 +160,8 @@ def videoFrame(file, folder):
     cap.release()
     output.release()
 
+    print("Finished!\n")
+
 if __name__ == "__main__":
 
     if args.mode == "video":
@@ -168,19 +170,17 @@ if __name__ == "__main__":
 
         folder = ".\\input\\"
 
-        # for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:1]:
+        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
     
-        #     filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
-        #     firstletter = filename[0]
-        #     current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-        #     fileID = re.findall(r'\d+', filename)[0]
+            filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
+            firstletter = filename[0]
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fileID = re.findall(r'\d+', filename)[0]
 
-        #     print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
+            print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
 
-        #     os.system(f"ffmpeg -i .\input\{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 .\input\{firstletter.lower()}{fileID}.mp4")
-        #     videoFrame(f"{firstletter.lower()}{fileID}", folder)
-
-        videoFrame(f"m1", folder)
+            os.system(f"ffmpeg -i .\input\{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 .\input\{firstletter.lower()}{fileID}.mp4")
+            videoFrame(f"{firstletter.lower()}{fileID}", folder)
 
     elif args.mode == "annotation":
 
