@@ -172,15 +172,21 @@ if __name__ == "__main__":
 
         for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
     
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
             firstletter = filename[0]
-            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             fileID = re.findall(r'\d+', filename)[0]
 
             print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
 
-            os.system(f"ffmpeg -i .\input\{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 .\input\{firstletter.lower()}{fileID}.mp4")
+            # Convert video to mp4
+            os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
+            
+            # Add frame
             videoFrame(f"{firstletter.lower()}{fileID}", folder)
+
+            # Crop video
+            # videoCrop()
 
     elif args.mode == "annotation":
 
