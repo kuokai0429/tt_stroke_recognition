@@ -19,64 +19,66 @@ args = parser.parse_args()
 
 def getTrainData_util2(train, train_label, i, start, end, step):
 
-  for count, j in enumerate(range(start, end, step)):
+    for count, j in enumerate(range(start, end, step)):
 
-    if count == 6:
-      break
+        if count == 6:
+            break
 
-    with open("/content/gdrive/MyDrive/專題, 論文, 實驗室/高中夏令營 - AI4kids/學生影片/student_TrainData/1/20220811_161414/openpose/txt/" + str(j) + ".txt", 'r', encoding= "utf-8") as f3:
-      temp = []
+        with open("/content/gdrive/MyDrive/專題, 論文, 實驗室/高中夏令營 - AI4kids/學生影片/student_TrainData/1/20220811_161414/openpose/txt/" + str(j) + ".txt", 'r', encoding= "utf-8") as f3:
+            temp = []
 
-      for r3 in f3.readlines():
-        temp.append([float(r3.split()[0]), float(r3.split()[1])])
+            for r3 in f3.readlines():
+                temp.append([float(r3.split()[0]), float(r3.split()[1])])
 
-    train.append(temp)
-      
-  train_label.append([i-1])
+            train.append(temp)
+        
+    train_label.append([i-1])
 
-  return train, train_label
+    return train, train_label
 
 
 def getTrainData_util1(f, i):
 
-  train, train_label = [], []
+    train, train_label = [], []
 
-  for r1 in f.readlines():
+    for r1 in f.readlines():
 
-    start, end = int(r1.split()[0]), int(r1.split()[1])
-    print("start end ", start, end)
+        start, end = int(r1.split()[0]), int(r1.split()[1])
+        print("start end ", start, end)
 
-    step = (end - start) // 6
-    extra = (end - start) % 6
-    print("step extra", step, extra)
-    print("extra data", end - range(start, end, step)[5])
+        step = (end - start) // 6
+        extra = (end - start) % 6
+        print("step extra", step, extra)
+        print("extra data", end - range(start, end, step)[5])
 
-    for z in range(end - range(start, end, step)[5]):
+        for z in range(end - range(start, end, step)[5]):
 
-      train, train_label = getTrainData_util2(train, train_label, i, start+z, end, step) 
-      print(len(train))
+            train, train_label = getTrainData_util2(train, train_label, i, start+z, end, step) 
+            print(len(train))
 
-  return (train, train_label)
+    return (train, train_label)
 
 
-def getTrainData():
+def prepareData(source, side):
+  
+    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[1:]:
+        print()
 
-  train, train_label = [], []
-  path = ""
+    train, train_label = [], []
 
-  for i in range(1, 3):
+    for i in range(1, 3):
 
-    with open("/content/gdrive/MyDrive/專題, 論文, 實驗室/高中夏令營 - AI4kids/學生影片/student_TrainData/1/20220811_161414/label/Label" + str(i) + ".txt", 'r', encoding= "utf-8") as f:
-      t, l = getTrainData_util1(f, i)
-      print()
+        with open("annotation/" + str(i) + ".txt", 'r', encoding= "utf-8") as f:
+            t, l = getTrainData_util1(f, i)
+            print()
 
-      train += t
-      train_label += l
+            train += t
+            train_label += l
 
-  train = np.asarray(train).reshape(-1, 150, 2)
-  train_label = np.asarray(train_label).reshape(-1, 1)
-          
-  return (train, train_label)
+    train = np.asarray(train).reshape(-1, 150, 2)
+    train_label = np.asarray(train_label).reshape(-1, 1)
+            
+    return (train, train_label)
 
 
 
@@ -166,7 +168,7 @@ if __name__ == "__main__":
 
         folder = ".\\input\\"
 
-        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[2:]:
+        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
     
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
@@ -198,7 +200,8 @@ if __name__ == "__main__":
 
         # (X_All, y_All) = prepareData()
         # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
+        X_train, X_test, y_train, y_test = prepareData("m", "right")
 
         # print(X_All.shape, y_All.shape)
-        # print(X_train.shape, y_train.shape)
-        # print(X_test.shape, y_test.shape)
+        print(X_train.shape, y_train.shape)
+        print(X_test.shape, y_test.shape)
