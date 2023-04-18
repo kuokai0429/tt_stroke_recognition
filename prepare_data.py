@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from sklearn.model_selection import train_test_split
 
 
 parser = argparse.ArgumentParser(description='main')
@@ -17,69 +18,52 @@ parser.add_argument('--mode', default="video", required=True, type=str, help="Mo
 args = parser.parse_args()
 
 
-def getTrainData_util2(train, train_label, i, start, end, step):
+def prepareData(source, side, window_size):
 
-    for count, j in enumerate(range(start, end, step)):
-
-        if count == 6:
-            break
-
-        with open("/content/gdrive/MyDrive/專題, 論文, 實驗室/高中夏令營 - AI4kids/學生影片/student_TrainData/1/20220811_161414/openpose/txt/" + str(j) + ".txt", 'r', encoding= "utf-8") as f3:
-            temp = []
-
-            for r3 in f3.readlines():
-                temp.append([float(r3.split()[0]), float(r3.split()[1])])
-
-            train.append(temp)
-        
-    train_label.append([i-1])
-
-    return train, train_label
-
-
-def getTrainData_util1(f, i):
+    stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
 
     train, train_label = [], []
 
-    for r1 in f.readlines():
-
-        start, end = int(r1.split()[0]), int(r1.split()[1])
-        print("start end ", start, end)
-
-        step = (end - start) // 6
-        extra = (end - start) % 6
-        print("step extra", step, extra)
-        print("extra data", end - range(start, end, step)[5])
-
-        for z in range(end - range(start, end, step)[5]):
-
-            train, train_label = getTrainData_util2(train, train_label, i, start+z, end, step) 
-            print(len(train))
-
-    return (train, train_label)
-
-
-def prepareData(source, side):
+    keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
+    print(keypoints_2d.files)
+    print(keypoints_2d['positions_2d'])
+    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0]))
+    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0][0]))
+    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0]))
+    keypoints_2d = dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0]
   
-    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[1:]:
-        print()
+    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
 
-    train, train_label = [], []
+        print(filepath)
 
-    for i in range(1, 3):
+        with open(filepath, 'r', encoding= "utf-8") as f:
 
-        with open("annotation/" + str(i) + ".txt", 'r', encoding= "utf-8") as f:
-            t, l = getTrainData_util1(f, i)
-            print()
+            for r1 in f.readlines():
 
-            train += t
-            train_label += l
+                start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
+                print("frame range ", start, end)
 
-    train = np.asarray(train).reshape(-1, 150, 2)
+                step = (end - start) // window_size
+                extra = (end - start) % window_size
+                print("step extra", step, extra)
+                print("extra data", end - range(start, end, step)[5], end="\n")
+
+                for z in range(end - range(start, end, step)[5]):
+                    for count, i in enumerate(range(start+z, end, step)):
+
+                        if count == window_size: break
+
+                        train.append(keypoints_2d[i])
+                        
+                    train_label.append([stroke_class[sc]])
+
+    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
-            
-    return (train, train_label)
 
+    print(len(train), len(train_label))
+    print(train, train_label)
+
+    return None, None
 
 
 def videoCrop(filepath, filename, output_directory):
@@ -135,6 +119,7 @@ def getVideoInfo(filepath):
 
     return int(fps), int(duration)
 
+
 def videoFrame(file, folder):
 
     print("Start adding frame!\n")
@@ -161,6 +146,7 @@ def videoFrame(file, folder):
     output.release()
 
     print("Finished!\n")
+
 
 if __name__ == "__main__":
 
@@ -196,12 +182,9 @@ if __name__ == "__main__":
 
         print("Mode: annotation")
 
-        stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
+        X_All, y_All = prepareData("m", "right", 10)
+        X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
 
-        # (X_All, y_All) = prepareData()
-        # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
-        X_train, X_test, y_train, y_test = prepareData("m", "right")
-
-        # print(X_All.shape, y_All.shape)
+        print(X_All.shape, y_All.shape)
         print(X_train.shape, y_train.shape)
         print(X_test.shape, y_test.shape)

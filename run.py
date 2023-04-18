@@ -22,9 +22,11 @@ def train_history_graphic(history, history_key1, history_key2, y_label) :
 	plt.savefig('./%s_v2.png' %(y_label))
 	plt.show()
 	plt.close()
-        
+
+
 def getTrainData():
     return None
+
 
 # def predVisualize(i, pred_mask):
 
@@ -75,4 +77,3 @@ if __name__ == "__main__":
     # Train Model.
 
     # Inference on Test Data.
-    
