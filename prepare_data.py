@@ -162,9 +162,7 @@ def videoFrame(file, folder):
 
 if __name__ == "__main__":
 
-    if args.mode == "video":
-
-        print("Mode: video")
+    if args.mode.startswith("video"):
 
         folder = ".\\input\\"
 
@@ -176,21 +174,27 @@ if __name__ == "__main__":
             fileID = re.findall(r'\d+', filename)[0]
 
             print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
-
-            # # Convert video to mp4
-            # os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
             
-            # # Add frame
-            # videoFrame(f"{firstletter.lower()}{fileID}", folder)
+            # Convert video to mp4
+            if args.mode == "video-convert":
+                os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
+            
+            # Add frame
+            elif args.mode == "video-addframe":
+                videoFrame(f"{firstletter.lower()}{fileID}", folder)
 
             # Crop video
-            videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
+            elif args.mode == "video-crop":
+                videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
 
-    elif args.mode == "annotation":
+            elif args.mode == "video-test":
+               print("Test")
+
+    elif args.mode.startswith("annotation"):
 
         print("Mode: annotation")
 
-        # Stroke Classes: {0: "其他", 1: "正手發球", 2: "反手發球", 3: "正手推球", 4: "反手推球", 5: "正手切球", 6: "反手切球"}
+        stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
 
         # (X_All, y_All) = prepareData()
         # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
