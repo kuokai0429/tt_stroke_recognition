@@ -125,7 +125,7 @@ def videoFrame(file, folder):
     print("Start adding frame!\n")
     
     cap = cv2.VideoCapture(f"{folder}{file}.mp4")
-    output = cv2.VideoWriter(f'{folder}result_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
+    output = cv2.VideoWriter(f'{folder}addframe_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
                              float(30), (int(cap.get(3)), int(cap.get(4))))
 
     count = 0
