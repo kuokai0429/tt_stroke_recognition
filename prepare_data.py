@@ -103,17 +103,16 @@ def videoCrop(filepath, filename, output_directory):
 
 def prepareData(source, side, window_size):
 
-    stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
-
-    train, train_label = [], []
-
     keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
     # print(keypoints_2d.files)
     # print(keypoints_2d['positions_2d'])
     print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
     print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
     print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+
     keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+    train, train_label, keypoints_frame = [], [], []
+    stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
   
     for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
 
@@ -136,22 +135,27 @@ def prepareData(source, side, window_size):
 
                         if count == window_size: break
 
-                        print(list(itertools.chain(*[keypoints_2d[i].tolist(), i])))
-
-                        train.append(list(itertools.chain(*[keypoints_2d[i].tolist(), i])))
+                        keypoints_frame.append([keypoints_2d[i], i])
+                        train.append(keypoints_2d[i])
                         
                     train_label.append([stroke_class[sc]])
 
-    train = np.asarray(train).reshape(-1, 17 * window_size, 3)
+    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
+    keypoints_frame = np.asarray(keypoints_frame)
 
-    # print(train, train_label)
-    print(train.shape, train_label.shape)
+    # print(train, train_label, keypoints_frame)
+    print(train.shape, train_label.shape, keypoints_frame.shape)
 
-    return None, None
+    return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def visualize(X, y, output_directory, source, side):
+def visualize(keypoints_frame, total_frames, output_directory, source, side):
+
+    keypoints_mask = [None] * (total_frames + 1)
+    
+    for kp, frame_id in keypoints_frame:
+        keypoints_mask[frame_id] = kp
 
     for filepath in sorted(glob.glob(f"{output_directory}/cropped_{source}*{side}.mp4"))[:1]:
         
@@ -167,10 +171,12 @@ def visualize(X, y, output_directory, source, side):
             if not ret:
                 print("Can't receive frame (stream end?). Exiting ...")
                 break
-            
-            # if i == 
-            # frame = cv2.circle(frame, (X[i][0], X[i][1]), radius=0, color=(0, 0, 255), thickness=-1)
-            cv2.imshow('frame', frame)
+
+            if keypoints_mask[i] is not None:
+                
+                for x, y in keypoints_mask[i]:
+                    frame = cv2.circle(frame, (int(x), int(y)), radius=3, color=(0, 255, 0), thickness=-1)
+                cv2.imshow('frame', frame)
 
             i += 1
 
@@ -179,9 +185,6 @@ def visualize(X, y, output_directory, source, side):
 
         cap.release()
         cv2.destroyAllWindows()
-
-
-
 
 
 if __name__ == "__main__":
@@ -218,11 +221,11 @@ if __name__ == "__main__":
 
         print("Mode: annotation")
 
-        X_All, y_All = prepareData("m", "right", 10)
+        X_All, y_All, kf, tf = prepareData("m", "right", 10)
         # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
 
         # print(X_All.shape, y_All.shape)
         # print(X_train.shape, y_train.shape)
         # print(X_test.shape, y_test.shape)
 
-        visualize(X_All, y_All, folder, "m", "right")
+        visualize(kf, tf, folder, "m", "right")
