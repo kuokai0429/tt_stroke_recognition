@@ -193,39 +193,51 @@ if __name__ == "__main__":
 
     if args.mode.startswith("video"):
 
-        for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
-    
-            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
-            firstletter = filename[0]
-            fileID = re.findall(r'\d+', filename)[0]
+        # 2d Pose estimation inference and preprocess.
+        if args.mode == "video-inference2d":
+            os.system("python common/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4")
+            os.system("python common/prepare_data_2d_custom.py -i input -o input -os myvideos")
 
-            print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
-            
-            # Convert video to mp4
-            if args.mode == "video-convert":
-                os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
-            
-            # Add frame
-            elif args.mode == "video-addframe":
-                videoFrame(f"{firstletter.lower()}{fileID}", folder)
+        # 3d Pose estimation inference.
+        elif args.mode == "video-inference3d":
+            print("Follow the instructions in VideoPose3D or Poseformer or MixSTE_revised.")
 
-            # Crop video
-            elif args.mode == "video-crop":
-                videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
+        # Video process related.
+        else:
 
-            elif args.mode == "video-test":
-               print("Test")
+            for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
+        
+                current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
+                firstletter = filename[0]
+                fileID = re.findall(r'\d+', filename)[0]
+
+                # print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
+                
+                # Convert video to mp4
+                if args.mode == "video-convert":
+                    os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
+                
+                # Add frame
+                elif args.mode == "video-addframe":
+                    videoFrame(f"{firstletter.lower()}{fileID}", folder)
+
+                # Crop video
+                elif args.mode == "video-crop":
+                    videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
+
 
     elif args.mode.startswith("annotation"):
 
-        print("Mode: annotation")
-
         X_All, y_All, kf, tf = prepareData("m", "right", 10)
-        # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
+        X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
 
-        # print(X_All.shape, y_All.shape)
-        # print(X_train.shape, y_train.shape)
-        # print(X_test.shape, y_test.shape)
+        # Visualizing annotation keypoints.
+        if args.mode == "annotation-visualize":
+            visualize(kf, tf, folder, "m", "right")
 
-        visualize(kf, tf, folder, "m", "right")
+        print(X_All.shape, y_All.shape)
+        print(X_train.shape, y_train.shape)
+        print(X_test.shape, y_test.shape)
+
+        

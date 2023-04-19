@@ -1,11 +1,4 @@
 
-# 2D Keypoints Inference
-python infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4
-python prepare_data_2d_custom.py -i input -o input -os myvideos
-
-# 3D Keypoints Inference
-Follow the instructions in VideoPose3D/Poseformer/MixSTE_revised
-
 # Prepare Data
 python prepare_data.py --mode video
 ( python preapare_data.py --mode annotation )
