@@ -18,52 +18,42 @@ parser.add_argument('--mode', default="video", required=True, type=str, help="Mo
 args = parser.parse_args()
 
 
-def prepareData(source, side, window_size):
+def getVideoInfo(filepath):
 
-    stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
+    cap = cv2.VideoCapture(filepath)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = frame_count / fps
 
-    train, train_label = [], []
+    return int(fps), int(duration)
 
-    keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
-    print(keypoints_2d.files)
-    print(keypoints_2d['positions_2d'])
-    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0]))
-    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0][0]))
-    print(len(dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0]))
-    keypoints_2d = dict(enumerate(keypoints_2d['positions_2d'].flatten()))[0]["myvideos.mp4"]["custom"][0]
-  
-    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
 
-        print(filepath)
+def videoFrame(file, folder):
 
-        with open(filepath, 'r', encoding= "utf-8") as f:
+    print("Start adding frame!\n")
+    
+    cap = cv2.VideoCapture(f"{folder}{file}.mp4")
+    output = cv2.VideoWriter(f'{folder}addframe_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
+                             float(30), (int(cap.get(3)), int(cap.get(4))))
 
-            for r1 in f.readlines():
+    count = 0
+    while(cap.isOpened()):
+        
+        count += 1
+        ret, frame = cap.read()
+        
+        if ret == True:
+            cv2.rectangle(frame, (40, 10), (1000, 60), (255, 255, 255), -1, cv2.LINE_AA)
+            cv2.putText(frame, "Frame: " + str(count), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                1.5, (0, 0, 0), 5, cv2.LINE_4)  
+            output.write(frame)
+        else:
+            break 
 
-                start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
-                print("frame range ", start, end)
+    cap.release()
+    output.release()
 
-                step = (end - start) // window_size
-                extra = (end - start) % window_size
-                print("step extra", step, extra)
-                print("extra data", end - range(start, end, step)[5], end="\n")
-
-                for z in range(end - range(start, end, step)[5]):
-                    for count, i in enumerate(range(start+z, end, step)):
-
-                        if count == window_size: break
-
-                        train.append(keypoints_2d[i])
-                        
-                    train_label.append([stroke_class[sc]])
-
-    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
-    train_label = np.asarray(train_label).reshape(-1, 1)
-
-    print(len(train), len(train_label))
-    print(train, train_label)
-
-    return None, None
+    print("Finished!\n")
 
 
 def videoCrop(filepath, filename, output_directory):
@@ -110,49 +100,69 @@ def videoCrop(filepath, filename, output_directory):
     cv2.destroyAllWindows()
 
 
-def getVideoInfo(filepath):
+def prepareData(source, side, window_size):
 
-    cap = cv2.VideoCapture(filepath)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duration = frame_count / fps
+    stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
 
-    return int(fps), int(duration)
+    train, train_label = [], []
+
+    keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
+    # print(keypoints_2d.files)
+    # print(keypoints_2d['positions_2d'])
+    print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
+    print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
+    print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+    keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+  
+    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
+
+        print(f"File path: {filepath}")
+
+        with open(filepath, 'r', encoding= "utf-8") as f:
+
+            for r1 in f.readlines():
+
+                start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
+                # print("frame range:", start, end)
+
+                step = (end - start) // window_size
+                extra = (end - start) % window_size
+                # print("(step, extra):", step, extra)
+                # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
+
+                for z in range(end - range(start, end, step)[window_size-1]):
+                    for count, i in enumerate(range(start+z, end, step)):
+
+                        if count == window_size: break
+
+                        train.append(keypoints_2d[i])
+                        
+                    train_label.append([stroke_class[sc]])
+
+    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
+    train_label = np.asarray(train_label).reshape(-1, 1)
+
+    # print(train, train_label)
+    print(train.shape, train_label.shape)
+
+    return None, None
 
 
-def videoFrame(file, folder):
+def visualize(X, y, output_directory, source, side):
 
-    print("Start adding frame!\n")
-    
-    cap = cv2.VideoCapture(f"{folder}{file}.mp4")
-    output = cv2.VideoWriter(f'{folder}addframe_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
-                             float(30), (int(cap.get(3)), int(cap.get(4))))
-
-    count = 0
-    while(cap.isOpened()):
+    for filepath in sorted(glob.glob(f"{output_directory}/cropped_{source}*{side}.mp4"))[:1]:
         
-        count += 1
-        ret, frame = cap.read()
-        
-        if ret == True:
-            cv2.rectangle(frame, (40, 10), (1000, 60), (255, 255, 255), -1, cv2.LINE_AA)
-            cv2.putText(frame, "Frame: " + str(count), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
-                1.5, (0, 0, 0), 5, cv2.LINE_4)  
-            output.write(frame)
-        else:
-            break 
+        print(f"File path: {filepath}")
 
-    cap.release()
-    output.release()
 
-    print("Finished!\n")
+
 
 
 if __name__ == "__main__":
 
-    if args.mode.startswith("video"):
+    folder = "input\\"
 
-        folder = ".\\input\\"
+    if args.mode.startswith("video"):
 
         for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
     
@@ -183,8 +193,10 @@ if __name__ == "__main__":
         print("Mode: annotation")
 
         X_All, y_All = prepareData("m", "right", 10)
-        X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
+        # X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
 
-        print(X_All.shape, y_All.shape)
-        print(X_train.shape, y_train.shape)
-        print(X_test.shape, y_test.shape)
+        # print(X_All.shape, y_All.shape)
+        # print(X_train.shape, y_train.shape)
+        # print(X_test.shape, y_test.shape)
+
+        visualize(X_All, y_All, folder, "m", "right")
