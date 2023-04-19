@@ -27,3 +27,11 @@ class LSTM_SR(nn.Module):
         lstm_out, self.hidden = self.lstm(lstm_in, self.hidden)
         output = self.linear(lstm_out[-1].view(self.batch_size, -1))
         return output
+    
+class CNN_SR(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward():
+        return None

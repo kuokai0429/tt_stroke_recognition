@@ -1,6 +1,6 @@
 
 # Prepare Data
-python prepare_data.py --mode video
+python prepare_data.py --mode video-
 ( python preapare_data.py --mode annotation )
 
 # Train
