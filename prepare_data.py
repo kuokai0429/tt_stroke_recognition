@@ -112,7 +112,7 @@ def prepareData(source, side, window_size):
 
     keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
     train, train_label, keypoints_frame = [], [], []
-    
+
     stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
   
     for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
@@ -231,14 +231,10 @@ if __name__ == "__main__":
     elif args.mode.startswith("annotation"):
 
         X_All, y_All, kf, tf = prepareData("m", "right", 10)
-        X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
+        print(X_All.shape, y_All.shape)
 
         # Visualizing annotation keypoints.
         if args.mode == "annotation-visualize":
             visualize(kf, tf, folder, "m", "right")
-
-        print(X_All.shape, y_All.shape)
-        print(X_train.shape, y_train.shape)
-        print(X_test.shape, y_test.shape)
 
         

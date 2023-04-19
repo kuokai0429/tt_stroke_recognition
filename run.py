@@ -5,14 +5,21 @@ import time
 import os
 import glob
 import re
+import random
 
+import torch
+import torch.optim as optim
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import cv2
 
-def train_history_graphic(history, history_key1, history_key2, y_label) :
+from common.model import LSTM_SR
 
+def train_history_graphic(history, history_key1, history_key2, y_label) :
+    
 	plt.plot( history.history[history_key1] )
 	plt.plot( history.history[history_key2] )
 	plt.title( 'train history' )
@@ -25,7 +32,95 @@ def train_history_graphic(history, history_key1, history_key2, y_label) :
 
 
 def getTrainData():
+
     return None
+
+
+def train_model(model, train_features, train_labels, num_epochs, learning_rate, optimizer=None):
+    
+    since = time.time()
+    if optimizer == None:
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    loss_function = nn.CrossEntropyLoss()
+    total_step = len(train_features)
+    model.train()
+
+    for epoch in range(num_epochs):
+
+        data = list(zip(train_features, train_labels))
+        random.shuffle(data)
+        train_features, train_labels = zip(*data)
+
+        correct = 0
+        total = 0
+
+        for i, (video, label) in enumerate(zip(train_features, train_labels)):
+            
+            # -1 here because loss function requires this to be between (0, num_classes]
+            label = label.type(torch.LongTensor).view(-1) - 1
+
+            if torch.cuda.is_available():
+                video, label = video.cuda(), label.cuda()
+
+            model.zero_grad()        
+            model.hidden = model.init_hidden()
+
+            predictions = model(video)
+            loss = loss_function(predictions, label) 
+            loss.backward()
+            optimizer.step()
+
+            # Track the accuracy
+            _, predicted = torch.max(predictions.data, 1)
+            total += label.size(0)
+            correct += (predicted == label).sum().item()
+
+            # if i != 0 and  i % (50) == 0:
+            #   print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Accuracy: {:.2f}%'
+            #           .format(epoch + 1, num_epochs, i + 1, total_step, loss.item(),
+            #                   (correct / total) * 100))
+
+        print('Training Accuracy for epoch {}: {:.3f}%'.format(epoch + 1, (correct / total) * 100))
+
+    elapsed = time.time() - since
+    print('Train time elapsed in seconds: ', elapsed)
+
+    return (correct / total) * 100
+
+
+def test_model(model, test_features, test_labels):
+
+    since = time.time()
+    model.eval()
+
+    with torch.no_grad():
+
+        correct = 0
+        total = 0
+
+        for video, label in zip(test_features, test_labels):
+            # -1 here because loss function during training required this to be between (0, num_classes]
+            label = label.type(torch.LongTensor).view(-1) - 1
+
+            if torch.cuda.is_available():
+                # Move to GPU
+                video, label = video.cuda(), label.cuda()
+
+            outputs = model(video)
+            _, predicted = torch.max(outputs.data, 1)
+            total += label.size(0)
+            correct += (predicted == label).sum().item()
+
+        print('Test Accuracy of the model on test images: {} %'.format((correct / total) * 100))
+    
+    elapsed = time.time() - since
+    print('Test time elapsed in seconds: ', elapsed)
+
+    return (correct / total) * 100
 
 
 # def predVisualize(i, pred_mask):
@@ -66,14 +161,23 @@ def getTrainData():
 
 if __name__ == "__main__":
 
-    # Get Training Data.
+    # Fetch Training Data.
     (X_All, y_All) = getTrainData()
     X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
-
     print(X_All.shape, y_All.shape)
     print(X_train.shape, y_train.shape)
     print(X_test.shape, y_test.shape)
 
     # Train Model.
+    num_epochs = 5
+    model = LSTM_SR(input_dim=4096, hidden_dim=512, num_layers=1, 
+                        batch_size=1, target_size=25)
+    training_accuracy = train_model(model, X_train, y_train, num_epochs, 0.05)
+
+    # Evaluate Model.
+    test_accuracy = test_model(model, X_test, y_test)
+    print('Training accuracy is %2.3f :' %(training_accuracy) )
+    print('Test accuracy is %2.3f :' %(test_accuracy) )
 
     # Inference on Test Data.
+
