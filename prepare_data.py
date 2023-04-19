@@ -6,6 +6,7 @@ import os
 import glob
 import re
 import argparse
+import itertools
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -135,11 +136,13 @@ def prepareData(source, side, window_size):
 
                         if count == window_size: break
 
-                        train.append(keypoints_2d[i])
+                        print(list(itertools.chain(*[keypoints_2d[i].tolist(), i])))
+
+                        train.append(list(itertools.chain(*[keypoints_2d[i].tolist(), i])))
                         
                     train_label.append([stroke_class[sc]])
 
-    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
+    train = np.asarray(train).reshape(-1, 17 * window_size, 3)
     train_label = np.asarray(train_label).reshape(-1, 1)
 
     # print(train, train_label)
@@ -153,6 +156,29 @@ def visualize(X, y, output_directory, source, side):
     for filepath in sorted(glob.glob(f"{output_directory}/cropped_{source}*{side}.mp4"))[:1]:
         
         print(f"File path: {filepath}")
+
+        cap = cv2.VideoCapture(filepath)
+        
+        i = 1
+        while cap.isOpened():
+
+            ret, frame = cap.read()
+
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            # if i == 
+            # frame = cv2.circle(frame, (X[i][0], X[i][1]), radius=0, color=(0, 0, 255), thickness=-1)
+            cv2.imshow('frame', frame)
+
+            i += 1
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
 
 
 
