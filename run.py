@@ -6,6 +6,10 @@ import os
 import glob
 import re
 import random
+from time import time
+from common.logging import Logger
+from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
 
 import torch
 import torch.optim as optim
@@ -59,7 +63,7 @@ def train_model(model, train_features, train_labels, num_epochs, learning_rate, 
         total = 0
 
         for i, (video, label) in enumerate(zip(train_features, train_labels)):
-            
+
             # -1 here because loss function requires this to be between (0, num_classes]
             label = label.type(torch.LongTensor).view(-1) - 1
 
@@ -171,7 +175,7 @@ if __name__ == "__main__":
     # Train Model.
     num_epochs = 5
     model = LSTM_SR(input_dim=4096, hidden_dim=512, num_layers=1, 
-                        batch_size=1, target_size=25)
+                        batch_size=1, num_classes=25)
     training_accuracy = train_model(model, X_train, y_train, num_epochs, 0.05)
 
     # Evaluate Model.

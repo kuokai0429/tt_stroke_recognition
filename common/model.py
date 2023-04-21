@@ -6,16 +6,18 @@ import torch.nn.functional as F
 
 class LSTM_SR(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, num_layers, batch_size, target_size):
+    def __init__(self, input_dim, hidden_dim, num_layers, batch_size, num_classes):
         super(LSTM_SR, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.batch_size = batch_size
-        self.target_size = target_size
+        self.num_classes = num_classes
 
-        self.lstm = nn.LSTM(input_dim, self.hidden_dim, self.num_layers)
-        self.linear = nn.Linear(hidden_dim, target_size)
+        self.lstm1 = nn.LSTM(input_dim, self.hidden_dim, self.num_layers)
+        self.lstm2 = nn.LSTM(input_dim, self.hidden_dim, self.num_layers)
+        self.linear = nn.Linear(hidden_dim, num_classes)
+        self.dropout = nn.Dropout(0.2)
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
@@ -34,4 +36,5 @@ class CNN_SR(nn.Module):
         super().__init__()
 
     def forward():
+
         return None
