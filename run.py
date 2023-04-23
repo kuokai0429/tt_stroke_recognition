@@ -26,6 +26,7 @@ from sklearn.metrics import classification_report
 
 from common.model import LSTM_SR
 from common.model import CNN_SR
+from common.dataset import StrokeRecognitionDataset
 
 
 parser = argparse.ArgumentParser(description='main')
@@ -217,9 +218,8 @@ if __name__ == "__main__":
     EPOCHS = 10
 
     # Define the train and val splits
-    TRAIN_TEST_SPLIT = 0.1
-    TRAIN_SPLIT = 0.75
-    VAL_SPLIT = 1 - TRAIN_SPLIT
+    TRAIN_TEST_SPLIT = 0.9
+    TRAIN_VAL_SPLIT = 0.8
 
     # Set up random seed on everything
     SEED = 0
@@ -231,21 +231,17 @@ if __name__ == "__main__":
     print(X_All.shape, y_All.shape)
 
     # Calculate the train/validation split
-    print("[INFO] generating the train/validation/test split...")
-    X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=TRAIN_TEST_SPLIT, random_state=SEED)
+    print("[INFO] Generating the train/val/test split...")
+    X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=1-TRAIN_TEST_SPLIT, random_state=SEED)
+    train_dataset = StrokeRecognitionDataset(X_train, y_train)
+    test_dataset = StrokeRecognitionDataset(X_test, y_test)
+    train_dataset, val_dataset = random_split(train_dataset, 
+                                    [int(len(X_train) * TRAIN_VAL_SPLIT), len(X_train) - int(len(X_train) * TRAIN_VAL_SPLIT)],
+                                    generator=torch.Generator().manual_seed(SEED))
     
     print(X_train.shape, y_train.shape)
     print(X_test.shape, y_test.shape)
-
-    train_dataset = TensorDataset(X_train, y_train)
-    test_dataset = TensorDataset(X_test, y_test)
-    print(len(train_dataset), len(test_dataset))
-    print(int(len(X_train) * TRAIN_SPLIT), int(len(X_train) * VAL_SPLIT))
-
-    train_dataset, val_dataset = random_split(train_dataset
-                                    [int(len(X_train) * TRAIN_SPLIT), int(len(X_train) * VAL_SPLIT)],
-                                    generator=torch.Generator().manual_seed(SEED))
-    print(train_dataset.shape, val_dataset.shape, test_dataset.shape)
+    print(len(train_dataset), len(val_dataset), len(test_dataset))
 
     '''
 
