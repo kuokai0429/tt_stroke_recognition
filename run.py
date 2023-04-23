@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import seaborn as sns
 
 import torch
 from torch.utils.data import random_split
@@ -23,6 +24,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
 
 from common.model import LSTM_SR
 from common.model import CNN_SR
@@ -35,7 +37,8 @@ parser.add_argument('--model', default="cnn", required=False, type=str, help="Mo
 args = parser.parse_args()
 
 
-def seed_everything(seed):
+def init_seed(seed):
+
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
@@ -89,18 +92,18 @@ def train_lstm(model, train_features, train_labels, num_epochs, learning_rate, o
         correct = 0
         total = 0
 
-        for i, (video, label) in enumerate(zip(train_features, train_labels)):
+        for i, (keypoints, label) in enumerate(zip(train_features, train_labels)):
 
             # -1 here because loss function requires this to be between (0, num_classes]
             label = label.type(torch.LongTensor).view(-1) - 1
 
             if torch.cuda.is_available():
-                video, label = video.cuda(), label.cuda()
+                keypoints, label = keypoints.cuda(), label.cuda()
 
             model.zero_grad()  # 清除 lstm 上個數據的偏微分暫存值，否則會一直累加      
             model.hidden = model.init_hidden()
 
-            predictions = model(video)
+            predictions = model(keypoints)
             loss = loss_function(predictions, label) 
             loss.backward()
             optimizer.step()
@@ -133,15 +136,15 @@ def test_lstm(model, test_features, test_labels):
         correct = 0
         total = 0
 
-        for video, label in zip(test_features, test_labels):
+        for keypoints, label in zip(test_features, test_labels):
             # -1 here because loss function during training required this to be between (0, num_classes]
             label = label.type(torch.LongTensor).view(-1) - 1
 
             if torch.cuda.is_available():
                 # Move to GPU
-                video, label = video.cuda(), label.cuda()
+                keypoints, label = keypoints.cuda(), label.cuda()
 
-            outputs = model(video)
+            outputs = model(keypoints)
             _, predicted = torch.max(outputs.data, 1)
             total += label.size(0)
             correct += (predicted == label).sum().item()
@@ -196,7 +199,6 @@ if __name__ == "__main__":
     folder = "input\\"
 
     # Tensorboard logging settings
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     description = "Train!"
     TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
     writer = SummaryWriter(args.log+'_'+TIMESTAMP)
@@ -213,17 +215,16 @@ if __name__ == "__main__":
     print(args)
 
     # Define training hyperparameters
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     INIT_LR = 1e-3
-    BATCH_SIZE = 64
-    EPOCHS = 10
-
-    # Define the train and val splits
+    BATCH_SIZE = 16
+    EPOCHS = 50
     TRAIN_TEST_SPLIT = 0.9
     TRAIN_VAL_SPLIT = 0.8
+    SEED = 0
 
     # Set up random seed on everything
-    SEED = 0
-    seed_everything(SEED)
+    init_seed(SEED)
 
     # Fetch Training Data.
     print("[INFO] Fetching Data...")
@@ -241,14 +242,17 @@ if __name__ == "__main__":
     
     print(X_train.shape, y_train.shape)
     print(X_test.shape, y_test.shape)
-    print(len(train_dataset), len(val_dataset), len(test_dataset))
+    print(f"Train: {len(train_dataset)}, Validation: {len(val_dataset)}, Test: {len(test_dataset)}")
+    print(train_dataset.dataset.classes)
 
-    '''
-
+    
     if args.model.startswith("lstm"):
 
+        print("Model: LSTM")
+
         # Train Model.
-        model = LSTM_SR(input_dim=, hidden_dim=, num_layers=2, batch_size=32, num_classes=7)
+        model = LSTM_SR(input_dim=340, hidden_dim=32, num_layers=2, 
+                        batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
         training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
 
         # Evaluate Model.
@@ -260,24 +264,25 @@ if __name__ == "__main__":
 
     elif args.model.startswith("cnn"):
 
-        # initialize the train, validation, and test data loaders
-        trainDataLoader = DataLoader(trainData, shuffle=True, batch_size=BATCH_SIZE)
-        valDataLoader = DataLoader(valData, batch_size=BATCH_SIZE)
-        testDataLoader = DataLoader(testData, batch_size=BATCH_SIZE)
+        print("Model: CNN")
 
-        # calculate steps per epoch for training and validation set
+        # Initialize the train, validation, and test data loaders
+        trainDataLoader = DataLoader(train_dataset, shuffle=True, batch_size=BATCH_SIZE)
+        valDataLoader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+        testDataLoader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
+
+        # Calculate steps per epoch for training and validation set
         trainSteps = len(trainDataLoader.dataset) // BATCH_SIZE
         valSteps = len(valDataLoader.dataset) // BATCH_SIZE
+        print(f"Train steps: {trainSteps}, Val steps: {valSteps}")
 
-        # initialize the LeNet model
-        print("[INFO] initializing the LeNet model...")
-        model = CNN_SR(
-            numChannels=1,
-            classes=len(trainData.dataset.classes)).to(device)
+        # Initialize the LeNet model
+        print("[INFO] initializing the CNN_SR model...")
+        model = CNN_SR(num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
         
         # initialize our optimizer and loss function
         opt = optim.Adam(model.parameters(), lr=INIT_LR)
-        lossFn = nn.NLLLoss()
+        loss_function = nn.CrossEntropyLoss()
 
         # initialize a dictionary to store training history
         H = {
@@ -292,32 +297,60 @@ if __name__ == "__main__":
 
         # loop over our epochs
         for e in range(0, EPOCHS):
+
             # set the model in training mode
-            model.train()
+            model.train() 
+
             # initialize the total training and validation loss
             totalTrainLoss = 0
             totalValLoss = 0
+
             # initialize the number of correct predictions in the training
             # and validation step
             trainCorrect = 0
             valCorrect = 0
+
             # loop over the training set
-            for (x, y) in trainDataLoader:
+            for x, y in trainDataLoader:
+
                 # send the input to the device
-                (x, y) = (x.to(device), y.to(device))
+                x, y = (x.to(DEVICE), y.to(DEVICE))
+
                 # perform a forward pass and calculate the training loss
                 pred = model(x)
-                loss = lossFn(pred, y)
+                loss = loss_function(pred, y)
+
                 # zero out the gradients, perform the backpropagation step,
                 # and update the weights
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
+
                 # add the loss to the total training loss so far and
                 # calculate the number of correct predictions
                 totalTrainLoss += loss
                 trainCorrect += (pred.argmax(1) == y).type(
                     torch.float).sum().item()
+                
+            # switch off autograd for evaluation
+            with torch.no_grad():
+
+                # set the model in evaluation mode
+                model.eval()
+
+                # loop over the validation set
+                for (x, y) in valDataLoader:
+
+                    # send the input to the device
+                    (x, y) = (x.to(DEVICE), y.to(DEVICE))
+
+                    # make the predictions and calculate the validation loss
+                    pred = model(x)
+                    totalValLoss += loss_function(pred, y)
+
+                    # calculate the number of correct predictions
+                    valCorrect += (pred.argmax(1) == y).type(
+                        torch.float).sum().item()
 
             # calculate the average training and validation loss
             avgTrainLoss = totalTrainLoss / trainSteps
@@ -328,9 +361,9 @@ if __name__ == "__main__":
             valCorrect = valCorrect / len(valDataLoader.dataset)
 
             # update our training history
-            H["train_loss"].append(avgTrainLoss.cpu().detach().numpy())
+            H["train_loss"].append(avgTrainLoss)
             H["train_acc"].append(trainCorrect)
-            H["val_loss"].append(avgValLoss.cpu().detach().numpy())
+            H["val_loss"].append(avgValLoss)
             H["val_acc"].append(valCorrect)
             
             # print the model training and validation information
@@ -354,18 +387,24 @@ if __name__ == "__main__":
             # initialize a list to store our predictions
             preds = []
             # loop over the test set
-            for (x, y) in testDataLoader:
+            for x, y in testDataLoader:
                 # send the input to the device
-                x = x.to(device)
+                x = x.to(DEVICE)
                 # make the predictions and add them to the list
                 pred = model(x)
                 preds.extend(pred.argmax(axis=1).cpu().numpy())
 
-        # generate a classification report
-        print(classification_report(testData.targets.cpu().numpy(),
-            np.array(preds), target_names=testData.classes))
+        # Generate a classification report
+        print(test_dataset.targets.cpu().numpy())
+        print(classification_report(test_dataset.targets.cpu().numpy(),
+            np.array(preds), target_names=test_dataset.classes))
         
-        # plot the training loss and accuracy
+        # Confusion Matrix
+        cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
+        print(cf_matrix)
+        sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+        
+        # Plot the training loss and accuracy
         plt.style.use("ggplot")
         plt.figure()
         plt.plot(H["train_loss"], label="train_loss")
@@ -378,7 +417,5 @@ if __name__ == "__main__":
         plt.legend(loc="lower left")
         plt.savefig(args["plot"])
 
-        # serialize the model to disk
+        # Serialize the model to disk
         torch.save(model, args["model"])
-
-    '''

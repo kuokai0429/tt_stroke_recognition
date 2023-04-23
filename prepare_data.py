@@ -247,8 +247,8 @@ if __name__ == "__main__":
             show_landmarks(kf, tf, folder, "m", "right")
 
         # Convert Training Data to Pytorch Tensor
-        X_All = torch.FloatTensor(X_All).view(-1, 17 * window_size, 2)
-        y_All = torch.FloatTensor(y_All).view(-1, 1)
+        X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * window_size * 2)
+        y_All = torch.LongTensor(y_All).view(-1)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
 
