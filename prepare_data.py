@@ -1,16 +1,20 @@
 # 2023.0417.1607 @Brian
 
-from datetime import datetime
-import time
+
 import os
 import glob
 import re
 import argparse
 import itertools
-
+import pickle
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
+from datetime import datetime
+import time
+
+import torch
+import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
 
@@ -146,7 +150,9 @@ def prepareData(source, side, window_size):
     keypoints_frame = np.asarray(keypoints_frame)
 
     # print(train, train_label, keypoints_frame)
-    print(train.shape, train_label.shape, keypoints_frame.shape)
+    print(f"Train Features Shape: {train.shape}")
+    print(f"Train Label Shape: {train_label.shape}")
+    print(f"Keypoints with Frame: {keypoints_frame.shape}")
 
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
@@ -230,11 +236,26 @@ if __name__ == "__main__":
 
     elif args.mode.startswith("annotation"):
 
+        # Prepare Training Data
         X_All, y_All, kf, tf = prepareData("m", "right", 10)
+        print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
 
         # Visualizing annotation keypoints.
         if args.mode == "annotation-visualize":
             visualize(kf, tf, folder, "m", "right")
 
-        
+        # Convert Training Data to Pytorch Tensor
+        X_All = torch.FloatTensor(X_All).view(-1)
+        y_All = torch.FloatTensor(y_All).view(-1)
+        print(type(X_All), type(y_All))
+        print(X_All.shape, y_All.shape)
+
+        # Save Traing Data to pickle
+        for k, v in [('X_All', X_All), ('y_All', y_All)]:
+            with open(f'{folder}{k}.pkl', 'wb') as f:
+                pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        for k, v in [('X_All', X_All), ('y_All', y_All)]:
+            with open(f'{folder}{k}.pkl', 'rb') as handle:
+                temp = pickle.load(handle)
