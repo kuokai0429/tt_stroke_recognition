@@ -17,6 +17,7 @@ import cv2
 import torch
 from torch.utils.data import random_split
 from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -28,9 +29,18 @@ from common.model import CNN_SR
 
 
 parser = argparse.ArgumentParser(description='main')
-parser.add_argument('--log', default="log/run", required=True, type=str, help="Log folder.")
-parser.add_argument('--model', default="cnn", required=True, type=str, help="Model.")
+parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
+parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
 args = parser.parse_args()
+
+
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 
 def train_history_graphic(history, history_key1, history_key2, y_label) :
@@ -46,16 +56,20 @@ def train_history_graphic(history, history_key1, history_key2, y_label) :
 	plt.close()
 
 
-def getTrainData():
+def getTrainData(folder):
 
-    return None
+    temp = []
+    for i in ['X_All', 'y_All']:
+        with open(f'{folder}{i}.pkl', 'rb') as handle:
+            temp.append(pickle.load(handle))
+
+    return temp
 
 
 def train_lstm(model, train_features, train_labels, num_epochs, learning_rate, optimizer=None):
     
     since = time.time()
-    if optimizer == None:
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -63,8 +77,7 @@ def train_lstm(model, train_features, train_labels, num_epochs, learning_rate, o
     loss_function = nn.CrossEntropyLoss()
     total_step = len(train_features)
 
-    # Set the model in training mode
-    model.train()
+    model.train() # Set the model in training mode
 
     for epoch in range(num_epochs):
 
@@ -83,7 +96,7 @@ def train_lstm(model, train_features, train_labels, num_epochs, learning_rate, o
             if torch.cuda.is_available():
                 video, label = video.cuda(), label.cuda()
 
-            model.zero_grad()        
+            model.zero_grad()  # 清除 lstm 上個數據的偏微分暫存值，否則會一直累加      
             model.hidden = model.init_hidden()
 
             predictions = model(video)
@@ -96,17 +109,17 @@ def train_lstm(model, train_features, train_labels, num_epochs, learning_rate, o
             total += label.size(0)
             correct += (predicted == label).sum().item()
 
-            # if i != 0 and  i % (50) == 0:
-            #   print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Accuracy: {:.2f}%'
-            #           .format(epoch + 1, num_epochs, i + 1, total_step, loss.item(),
-            #                   (correct / total) * 100))
+            if i != 0:
+              print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}, Accuracy: {:.2f}%'
+                      .format(epoch + 1, num_epochs, i + 1, total_step, loss.item(), (correct / total) * 100))
 
-        print('Training Accuracy for epoch {}: {:.3f}%'.format(epoch + 1, (correct / total) * 100))
+        training_accuracy = (correct / total) * 100
+        print('Training Accuracy for epoch {}: {:.3f}%'.format(epoch + 1, training_accuracy))
 
     elapsed = time.time() - since
     print('Train time elapsed in seconds: ', elapsed)
 
-    return (correct / total) * 100
+    return training_accuracy
 
 
 def test_lstm(model, test_features, test_labels):
@@ -132,12 +145,13 @@ def test_lstm(model, test_features, test_labels):
             total += label.size(0)
             correct += (predicted == label).sum().item()
 
-        print('Test Accuracy of the model on test images: {} %'.format((correct / total) * 100))
+        testing_accuracy = (correct / total) * 100
+        print('Test Accuracy of the model on test images: {} %'.format(testing_accuracy))
     
     elapsed = time.time() - since
     print('Test time elapsed in seconds: ', elapsed)
 
-    return (correct / total) * 100
+    return testing_accuracy
 
 
 # def predVisualize(i, pred_mask):
@@ -178,9 +192,10 @@ def test_lstm(model, test_features, test_labels):
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    folder = "input\\"
 
     # Tensorboard logging settings
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     description = "Train!"
     TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
     writer = SummaryWriter(args.log+'_'+TIMESTAMP)
@@ -196,20 +211,49 @@ if __name__ == "__main__":
     print("CUDA Device Count: ", torch.cuda.device_count())
     print(args)
 
+    # Define training hyperparameters
+    INIT_LR = 1e-3
+    BATCH_SIZE = 64
+    EPOCHS = 10
+
+    # Define the train and val splits
+    TRAIN_TEST_SPLIT = 0.1
+    TRAIN_SPLIT = 0.75
+    VAL_SPLIT = 1 - TRAIN_SPLIT
+
+    # Set up random seed on everything
+    SEED = 0
+    seed_everything(SEED)
+
     # Fetch Training Data.
-    (X_All, y_All) = getTrainData()
-    X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=0.1, random_state=0)
+    print("[INFO] Fetching Data...")
+    X_All, y_All = getTrainData(folder)[0], getTrainData(folder)[1]
     print(X_All.shape, y_All.shape)
+
+    # Calculate the train/validation split
+    print("[INFO] generating the train/validation/test split...")
+    X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=TRAIN_TEST_SPLIT, random_state=SEED)
+    
     print(X_train.shape, y_train.shape)
     print(X_test.shape, y_test.shape)
+
+    train_dataset = TensorDataset(X_train, y_train)
+    test_dataset = TensorDataset(X_test, y_test)
+    print(len(train_dataset), len(test_dataset))
+    print(int(len(X_train) * TRAIN_SPLIT), int(len(X_train) * VAL_SPLIT))
+
+    train_dataset, val_dataset = random_split(train_dataset
+                                    [int(len(X_train) * TRAIN_SPLIT), int(len(X_train) * VAL_SPLIT)],
+                                    generator=torch.Generator().manual_seed(SEED))
+    print(train_dataset.shape, val_dataset.shape, test_dataset.shape)
+
+    '''
 
     if args.model.startswith("lstm"):
 
         # Train Model.
-        num_epochs = 5
-        model = LSTM_SR(input_dim=4096, hidden_dim=512, num_layers=1, 
-                            batch_size=1, num_classes=25)
-        training_accuracy = train_lstm(model, X_train, y_train, num_epochs, 0.05)
+        model = LSTM_SR(input_dim=, hidden_dim=, num_layers=2, batch_size=32, num_classes=7)
+        training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
 
         # Evaluate Model.
         test_accuracy = test_lstm(model, X_test, y_test)
@@ -219,30 +263,6 @@ if __name__ == "__main__":
         # Inference on Test Data.
 
     elif args.model.startswith("cnn"):
-
-        # define training hyperparameters
-        INIT_LR = 1e-3
-        BATCH_SIZE = 64
-        EPOCHS = 10
-
-        # define the train and val splits
-        TRAIN_SPLIT = 0.75
-        VAL_SPLIT = 1 - TRAIN_SPLIT
-
-        # load the KMNIST dataset
-        print("[INFO] loading the KMNIST dataset...")
-        trainData = KMNIST(root="data", train=True, download=True,
-            transform=ToTensor())
-        testData = KMNIST(root="data", train=False, download=True,
-            transform=ToTensor())
-
-        # calculate the train/validation split
-        print("[INFO] generating the train/validation split...")
-        numTrainSamples = int(len(trainData) * TRAIN_SPLIT)
-        numValSamples = int(len(trainData) * VAL_SPLIT)
-        (trainData, valData) = random_split(trainData,
-            [numTrainSamples, numValSamples],
-            generator=torch.Generator().manual_seed(42))
 
         # initialize the train, validation, and test data loaders
         trainDataLoader = DataLoader(trainData, shuffle=True, batch_size=BATCH_SIZE)
@@ -361,7 +381,8 @@ if __name__ == "__main__":
         plt.ylabel("Loss/Accuracy")
         plt.legend(loc="lower left")
         plt.savefig(args["plot"])
-        
+
         # serialize the model to disk
         torch.save(model, args["model"])
-    
+
+    '''

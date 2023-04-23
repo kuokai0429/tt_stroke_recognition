@@ -157,7 +157,7 @@ def prepareData(source, side, window_size):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def visualize(keypoints_frame, total_frames, output_directory, source, side):
+def show_landmarks(keypoints_frame, total_frames, output_directory, source, side):
 
     keypoints_mask = [None] * (total_frames + 1)
     
@@ -237,17 +237,18 @@ if __name__ == "__main__":
     elif args.mode.startswith("annotation"):
 
         # Prepare Training Data
-        X_All, y_All, kf, tf = prepareData("m", "right", 10)
+        window_size = 10
+        X_All, y_All, kf, tf = prepareData("m", "right", window_size)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
 
         # Visualizing annotation keypoints.
         if args.mode == "annotation-visualize":
-            visualize(kf, tf, folder, "m", "right")
+            show_landmarks(kf, tf, folder, "m", "right")
 
         # Convert Training Data to Pytorch Tensor
-        X_All = torch.FloatTensor(X_All).view(-1)
-        y_All = torch.FloatTensor(y_All).view(-1)
+        X_All = torch.FloatTensor(X_All).view(-1, 17 * window_size, 2)
+        y_All = torch.FloatTensor(y_All).view(-1, 1)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
 
@@ -255,7 +256,3 @@ if __name__ == "__main__":
         for k, v in [('X_All', X_All), ('y_All', y_All)]:
             with open(f'{folder}{k}.pkl', 'wb') as f:
                 pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-        for k, v in [('X_All', X_All), ('y_All', y_All)]:
-            with open(f'{folder}{k}.pkl', 'rb') as handle:
-                temp = pickle.load(handle)

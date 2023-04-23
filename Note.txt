@@ -4,7 +4,7 @@ python prepare_data.py --mode video-
 ( python preapare_data.py --mode annotation )
 
 # Train
-python run.py -l log/run --mode train
+python run.py
 
 # Inference
-python run.py --mode evaluate
+python run.py
