@@ -166,10 +166,9 @@ def prepareData_txt(source, side, window_size):
             for r1 in f.readlines():
 
                 start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
-                # print("frame range:", start, end)
-
                 step = (end - start) // window_size
                 extra = (end - start) % window_size
+                # print("frame range:", start, end)
                 # print("(step, extra):", step, extra)
                 # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
 
@@ -195,64 +194,70 @@ def prepareData_txt(source, side, window_size):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def prepareData_csv(source, side, window_size):
+def prepareData_csv(side, window_size):
 
     '''
-    Old: ( f1.csv 5589 紀錄球過半 )
+    <All>: ( f1.csv 5589 紀錄球過半 )
     0 : 其他, 1 : 左正手發球, 2 : 左反手發球, 3 : 左正手回球, 4 : 左反手回球, 
     5 : 右正手發球, 6 : 右反手發球, 7 : 右正手回球, 8 : 右反手回球
     
-    New: 
-    Left  (0: 其他, 1: 左正手發球, 2: 左反手發球, 3: 左正手回球, 4: 左反手回球) 
-    Right (0: 其他, 1: 右正手發球, 2: 右反手發球, 3: 右正手回球, 4: 右反手回球)
+    <Left>:  
+    0: 其他, 1: 左正手發球, 2: 左反手發球, 3: 左正手回球, 4: 左反手回球
+    
+    <Right>: 
+    0: 其他, 1: 右正手發球, 2: 右反手發球, 3: 右正手回球, 4: 右反手回球
     '''
 
-    keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
-    # print(keypoints_2d.files)
-    # print(keypoints_2d['positions_2d'])
-    print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
-    print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
-    print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
-    keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
-
-    train, train_label, keypoints_frame = [], [], []
+    train, train_label, keypoints_frame, total_frame = [], [], [], []
 
     stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
+
+    for gender in ["f", "m"]:
   
-    # for filepath in sorted(glob.glob(f"annotation/{source}*{side}.csv"))[:1]:
-    for filepath in sorted(glob.glob(f"annotation/*{side}.csv"))[:1]:
+        for filepath in sorted(glob.glob(f"annotation/{gender}*{side}.csv"))[:]:
 
-        print(f"File path: {filepath}")
-        
-        df = pd.read_csv(filepath)
-        for index, row in df.iterrows():
-            
-            start, end, sc = row['start'], row['end'], row['label']
-            step = (end - start) // window_size
-            extra = (end - start) % window_size
+            print(f"File path: {filepath}")
+            keypoints_2d = np.load(glob.glob(f"input/cropped_{gender}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
+            # print(keypoints_2d.files)
+            # print(keypoints_2d['positions_2d'])
+            print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
+            print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
+            print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+            keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+            df = pd.read_csv(filepath, encoding='utf8')
 
-            for z in range(end - range(start, end, step)[window_size-1]):
-                    for count, i in enumerate(range(start+z, end, step)):
+            for index, row in df.iterrows():
+                
+                start, end, sc = row['start'], row['end'], row['label']
+                step = (end - start) // window_size
+                extra = (end - start) % window_size
+                # print("frame range:", start, end)
+                # print("(step, extra):", step, extra)
+                # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
 
-                        if count == window_size: break
+                for z in range(end - range(start, end, step)[window_size-1]):
+                        for count, i in enumerate(range(start+z, end, step)):
 
-                        keypoints_frame.append([keypoints_2d[i], i])
-                        train.append(keypoints_2d[i])
-                        
-                    train_label.append([stroke_class[sc]])
+                            if count == window_size: break
 
-        print(len(train), len(train_label))
+                            keypoints_frame.append([keypoints_2d[i], i])
+                            train.append(keypoints_2d[i])
+                            
+                        train_label.append([stroke_class[sc]])
+
+            print(len(train), len(train_label))
 
     train = np.asarray(train).reshape(-1, 17 * window_size, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
-    keypoints_frame = np.asarray(keypoints_frame)
+    keypoints_frame.append(np.asarray(keypoints_frame))
+    total_frame.append(len(keypoints_2d))
 
     # print(train, train_label, keypoints_frame)
     print(f"Train Features Shape: {train.shape}")
     print(f"Train Label Shape: {train_label.shape}")
     print(f"Keypoints with Frame: {keypoints_frame.shape}")
 
-    return train, train_label, keypoints_frame, len(keypoints_2d)
+    return train, train_label, keypoints_frame, total_frame
 
 
 if __name__ == "__main__":
@@ -300,7 +305,7 @@ if __name__ == "__main__":
         # Prepare Training Data
         window_size = 10
         # X_All, y_All, kf, tf = prepareData_txt("m", "right", window_size)
-        X_All, y_All, kf, tf = prepareData_csv("f", "right", window_size)
+        X_All, y_All, kf, tf = prepareData_csv("right", window_size)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
 
