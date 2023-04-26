@@ -217,16 +217,43 @@ def prepareData_csv(source, side, window_size):
 
     train, train_label, keypoints_frame = [], [], []
 
-    stroke_class =  {"其他": 0, "左正手發球": 1, "左反手發球": 2, "左正手回球": 3, "左反手回球": 4, "右正手發球": 5, "右反手發球": 6, "右正手回球": 7, "右反手回球": 8}
+    stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
   
-    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.csv"))[:1]:
+    # for filepath in sorted(glob.glob(f"annotation/{source}*{side}.csv"))[:1]:
+    for filepath in sorted(glob.glob(f"annotation/*{side}.csv"))[:1]:
 
         print(f"File path: {filepath}")
         
         df = pd.read_csv(filepath)
         for index, row in df.iterrows():
-            print(row['start'], row['end'], row['label'])
+            
             start, end, sc = row['start'], row['end'], row['label']
+            step = (end - start) // window_size
+            extra = (end - start) % window_size
+
+            for z in range(end - range(start, end, step)[window_size-1]):
+                    for count, i in enumerate(range(start+z, end, step)):
+
+                        if count == window_size: break
+
+                        keypoints_frame.append([keypoints_2d[i], i])
+                        train.append(keypoints_2d[i])
+                        
+                    train_label.append([stroke_class[sc]])
+
+        print(len(train), len(train_label))
+
+    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
+    train_label = np.asarray(train_label).reshape(-1, 1)
+    keypoints_frame = np.asarray(keypoints_frame)
+
+    # print(train, train_label, keypoints_frame)
+    print(f"Train Features Shape: {train.shape}")
+    print(f"Train Label Shape: {train_label.shape}")
+    print(f"Keypoints with Frame: {keypoints_frame.shape}")
+
+    return train, train_label, keypoints_frame, len(keypoints_2d)
+
 
     return None, None, None, None
 
@@ -276,9 +303,6 @@ if __name__ == "__main__":
         # Prepare Training Data
         window_size = 10
         # X_All, y_All, kf, tf = prepareData_txt("m", "right", window_size)
-        # print(type(X_All), type(y_All))
-        # print(X_All.shape, y_All.shape)
-
         X_All, y_All, kf, tf = prepareData_csv("f", "right", window_size)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)
