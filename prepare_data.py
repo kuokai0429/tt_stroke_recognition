@@ -255,9 +255,6 @@ def prepareData_csv(source, side, window_size):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-    return None, None, None, None
-
-
 if __name__ == "__main__":
 
     folder = "input\\"
