@@ -8,7 +8,7 @@ import re
 import random
 import time
 from datetime import datetime
-from common.logging import Logger
+from common.log import Logger
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import matplotlib.pyplot as plt
