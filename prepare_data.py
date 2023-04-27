@@ -143,48 +143,44 @@ def showLandmarks(keypoints_frame, total_frames, output_directory, source, side)
         cv2.destroyAllWindows()
 
 
-def prepareData_txt(source, side, window_size):
+def prepareData_txt(filename, window_size):
 
-    keypoints_2d = np.load(glob.glob(f"input/cropped_{source}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
-    # print(keypoints_2d.files)
-    # print(keypoints_2d['positions_2d'])
-    print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
-    print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
-    print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
-    keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+    print(f"File: {filename}")
 
     train, train_label, keypoints_frame = [], [], []
-
     stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
-  
-    for filepath in sorted(glob.glob(f"annotation/{source}*{side}.txt"))[:1]:
 
-        print(f"File path: {filepath}")
+    loaded_keypoints_2d = np.load(f"input/cropped_{filename}.npz", encoding='latin1', allow_pickle=True)
+    # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
+    print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
+    print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
+    print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+    keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
 
-        with open(filepath, 'r', encoding= "utf-8") as f:
+    with open(f"annotation/{filename}.txt", 'r', encoding= "utf-8") as f:
 
-            for r1 in f.readlines():
+        for r1 in f.readlines():
 
-                start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
-                step = (end - start) // window_size
-                extra = (end - start) % window_size
-                # print("frame range:", start, end)
-                # print("(step, extra):", step, extra)
-                # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
+            start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
+            step = (end - start) // window_size
+            extra = (end - start) % window_size
+            # print("frame range:", start, end)
+            # print("(step, extra):", step, extra)
+            # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
 
-                for z in range(end - range(start, end, step)[window_size-1]):
-                    for count, i in enumerate(range(start+z, end, step)):
+            for z in range(end - range(start, end, step)[window_size-1]):
+                for count, i in enumerate(range(start+z, end, step)):
 
-                        if count == window_size: break
+                    if count == window_size: break
 
-                        keypoints_frame.append([keypoints_2d[i], i])
-                        train.append(keypoints_2d[i])
-                        
-                    train_label.append([stroke_class[sc]])
+                    keypoints_frame.append([keypoints_2d[i], i])
+                    train.append(keypoints_2d[i])
+                    
+                train_label.append([stroke_class[sc]])
 
     train = np.asarray(train).reshape(-1, 17 * window_size, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
-    keypoints_frame = np.asarray(keypoints_frame)
+    keypoints_frame = np.asarray(keypoints_frame, dtype=object)
 
     # print(train, train_label, keypoints_frame)
     print(f"Train Features Shape: {train.shape}")
@@ -194,7 +190,7 @@ def prepareData_txt(source, side, window_size):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def prepareData_csv(side, window_size):
+def prepareData_csv(window_size):
 
     '''
     <All>: ( f1.csv 5589 紀錄球過半 )
@@ -208,22 +204,23 @@ def prepareData_csv(side, window_size):
     0: 其他, 1: 右正手發球, 2: 右反手發球, 3: 右正手回球, 4: 右反手回球
     '''
 
-    train, train_label, keypoints_frame, total_frame = [], [], [], []
-
+    train, train_label, keypoints_frame_all, frame_length_all = [], [], {}, {}
     stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
 
-    for gender in ["f", "m"]:
+    for gender, side in [("f", "right"), ("m", "right")]:
   
         for filepath in sorted(glob.glob(f"annotation/{gender}*{side}.csv"))[:]:
-
-            print(f"File path: {filepath}")
-            keypoints_2d = np.load(glob.glob(f"input/cropped_{gender}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
-            # print(keypoints_2d.files)
-            # print(keypoints_2d['positions_2d'])
-            print(f'Number of frames: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
-            print(f'Number of keypoints: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
-            print(f'Number of coordinates: {len(dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
-            keypoints_2d = dict(enumerate(keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+            
+            filename = filepath.rsplit('\\')[1].rsplit('.')[0]
+            print(f"File path: {filepath} -> {filename}")
+            
+            keypoints_frame = []
+            loaded_keypoints_2d = np.load(glob.glob(f"input/cropped_{gender}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
+            # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
+            print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
+            print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
+            print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+            keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
             df = pd.read_csv(filepath, encoding='utf8')
 
             for index, row in df.iterrows():
@@ -245,19 +242,19 @@ def prepareData_csv(side, window_size):
                             
                         train_label.append([stroke_class[sc]])
 
-            print(len(train), len(train_label))
+            print(f'Number of Train features/labels: {len(train)}/{len(train_label)}')
+            keypoints_frame_all[filename] = np.asarray(keypoints_frame, dtype=object)
+            frame_length_all[filename] = len(keypoints_2d)
 
     train = np.asarray(train).reshape(-1, 17 * window_size, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
-    keypoints_frame.append(np.asarray(keypoints_frame))
-    total_frame.append(len(keypoints_2d))
 
-    # print(train, train_label, keypoints_frame)
+    # print(train, train_label, keypoints_frame_all)
     print(f"Train Features Shape: {train.shape}")
     print(f"Train Label Shape: {train_label.shape}")
-    print(f"Keypoints with Frame: {keypoints_frame.shape}")
+    print(f"Keypoints with Frame: {[(k, v.shape) for k, v in keypoints_frame_all.items()]}")
 
-    return train, train_label, keypoints_frame, total_frame
+    return train, train_label, keypoints_frame_all, frame_length_all
 
 
 if __name__ == "__main__":
@@ -304,14 +301,14 @@ if __name__ == "__main__":
 
         # Prepare Training Data
         window_size = 10
-        # X_All, y_All, kf, tf = prepareData_txt("m", "right", window_size)
-        X_All, y_All, kf, tf = prepareData_csv("right", window_size)
-        print(type(X_All), type(y_All))
-        print(X_All.shape, y_All.shape)
+        # X_All, y_All, kf, tf = prepareData_txt("m1_right", window_size)
+        X_All, y_All, kfa, fla = prepareData_csv(window_size)
+        print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
+        print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
-        # # Visualizing annotation keypoints.
-        # if args.mode == "annotation-visualize":
-        #     showLandmarks(kf, tf, folder, "m", "right")
+        # Visualizing annotation keypoints.
+        if args.mode == "annotation-visualize":
+            showLandmarks(kfa['f1_right'], fla['f1_right'], folder, "f1", "right")
 
         # # Convert Training Data to Pytorch Tensor
         # X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * window_size * 2)
