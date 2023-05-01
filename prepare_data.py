@@ -143,7 +143,7 @@ def showLandmarks(keypoints_frame, total_frames, output_directory, source, side)
         cv2.destroyAllWindows()
 
 
-def prepareData_txt(filename, window_size):
+def prepareData_txt(filename, model_input_frames):
 
     print(f"File: {filename}")
 
@@ -162,23 +162,23 @@ def prepareData_txt(filename, window_size):
         for r1 in f.readlines():
 
             start, end, sc = int(r1.split()[0]), int(r1.split()[1]), str(r1.split()[2])
-            step = (end - start) // window_size
-            extra = (end - start) % window_size
+            step = (end - start) // model_input_frames
+            extra = (end - start) % model_input_frames
             # print("frame range:", start, end)
             # print("(step, extra):", step, extra)
-            # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
+            # print("total extra data:", end - range(start, end, step)[model_input_frames-1] - 1, end="\n")
 
-            for z in range(end - range(start, end, step)[window_size-1]):
+            for z in range(end - range(start, end, step)[model_input_frames-1]):
                 for count, i in enumerate(range(start+z, end, step)):
 
-                    if count == window_size: break
+                    if count == model_input_frames: break
 
                     keypoints_frame.append([keypoints_2d[i], i])
                     train.append(keypoints_2d[i])
                     
                 train_label.append([stroke_class[sc]])
 
-    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
+    train = np.asarray(train).reshape(-1, 17 * model_input_frames, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
     keypoints_frame = np.asarray(keypoints_frame, dtype=object)
 
@@ -190,7 +190,7 @@ def prepareData_txt(filename, window_size):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def prepareData_csv(window_size):
+def prepareData_csv(model_input_frames):
 
     '''
     <All>:
@@ -226,27 +226,32 @@ def prepareData_csv(window_size):
             for index, row in df.iterrows():
                 
                 start, end, sc = row['start'], row['end'], row['label']
-                step = (end - start) // window_size
-                extra = (end - start) % window_size
+                step = (end - start) // model_input_frames
+                extra = (end - start) % model_input_frames
                 # print("frame range:", start, end)
                 # print("(step, extra):", step, extra)
-                # print("total extra data:", end - range(start, end, step)[window_size-1] - 1, end="\n")
+                # print("total extra data:", end - range(start, end, step)[model_input_frames-1] - 1, end="\n")
 
-                for z in range(end - range(start, end, step)[window_size-1]):
+                # Preparing train data for stroke classes from 1~4 
+                for z in range(end - range(start, end, step)[model_input_frames-1]):
                         for count, i in enumerate(range(start+z, end, step)):
 
-                            if count == window_size: break
+                            if count == model_input_frames: break
 
                             keypoints_frame.append([keypoints_2d[i], i])
                             train.append(keypoints_2d[i])
                             
                         train_label.append([stroke_class[sc]])
 
+                # Preparing train data for stroke class 0
+                
+
+
             print(f'Number of Train features/labels: {len(train)}/{len(train_label)}')
             keypoints_frame_all[filename] = np.asarray(keypoints_frame, dtype=object)
             frame_length_all[filename] = len(keypoints_2d)
 
-    train = np.asarray(train).reshape(-1, 17 * window_size, 2)
+    train = np.asarray(train).reshape(-1, 17 * model_input_frames, 2)
     train_label = np.asarray(train_label).reshape(-1, 1)
 
     # print(train, train_label, keypoints_frame_all)
@@ -300,9 +305,9 @@ if __name__ == "__main__":
     elif args.mode.startswith("annotation"):
 
         # Prepare Training Data
-        window_size = 10
-        # X_All, y_All, kf, tf = prepareData_txt("m1_right", window_size)
-        X_All, y_All, kfa, fla = prepareData_csv(window_size)
+        model_input_frames = 10
+        # X_All, y_All, kf, tf = prepareData_txt("m1_right", model_input_frames)
+        X_All, y_All, kfa, fla = prepareData_csv(model_input_frames)
         print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
         print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
@@ -312,7 +317,7 @@ if __name__ == "__main__":
             showLandmarks(kfa[f'{src}_right'], fla[f'{src}_right'], folder, src, "right")
 
         # # Convert Training Data to Pytorch Tensor
-        # X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * window_size * 2)
+        # X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * model_input_frames * 2)
         # y_All = torch.LongTensor(y_All).view(-1)
         # print(type(X_All), type(y_All))
         # print(X_All.shape, y_All.shape)
