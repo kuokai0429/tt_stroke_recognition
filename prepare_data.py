@@ -193,7 +193,7 @@ def prepareData_txt(filename, window_size):
 def prepareData_csv(window_size):
 
     '''
-    <All>: ( f1.csv 5589 紀錄球過半 )
+    <All>:
     0 : 其他, 1 : 左正手發球, 2 : 左反手發球, 3 : 左正手回球, 4 : 左反手回球, 
     5 : 右正手發球, 6 : 右反手發球, 7 : 右正手回球, 8 : 右反手回球
     
@@ -215,7 +215,7 @@ def prepareData_csv(window_size):
             print(f"File path: {filepath} -> {filename}")
             
             keypoints_frame = []
-            loaded_keypoints_2d = np.load(glob.glob(f"input/cropped_{gender}*{side}.npz")[0], encoding='latin1', allow_pickle=True)
+            loaded_keypoints_2d = np.load(glob.glob(f"input/cropped_{filename}.npz")[0], encoding='latin1', allow_pickle=True)
             # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
             print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
             print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
@@ -307,8 +307,9 @@ if __name__ == "__main__":
         print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
         # Visualizing annotation keypoints.
-        if args.mode == "annotation-visualize":
-            showLandmarks(kfa['f1_right'], fla['f1_right'], folder, "f1", "right")
+        if args.mode.startswith("annotation-visualize"):
+            src = args.mode.rsplit('-')[-1]
+            showLandmarks(kfa[f'{src}_right'], fla[f'{src}_right'], folder, src, "right")
 
         # # Convert Training Data to Pytorch Tensor
         # X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * window_size * 2)
