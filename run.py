@@ -284,7 +284,9 @@ def test_cnn(model, history):
     # Confusion Matrix
     cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
     print(cf_matrix)
-    sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+    svm = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+    figure = svm.get_figure()    
+    figure.savefig(f'checkpoint/confusion_matrix_{TIMESTAMP[:-1]}.png', dpi=400)
     
     # Plot the training loss and accuracy
     plt.style.use("ggplot")
