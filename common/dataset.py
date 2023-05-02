@@ -6,7 +6,7 @@ class StrokeRecognitionDataset:
 
         self.features = features
         self.targets = targets
-        self.classes = {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
+        self.classes = {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
         
     def __len__(self):
 

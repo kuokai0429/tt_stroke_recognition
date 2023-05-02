@@ -34,7 +34,7 @@ from common.dataset import StrokeRecognitionDataset
 parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
 parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
-parser.add_argument('--evaluate', action='store_true', help='Evaluate Mode.')
+parser.add_argument('--inference', action='store_true', help='Inference Mode.')
 args = parser.parse_args()
 
 
@@ -159,6 +159,150 @@ def test_lstm(model, test_features, test_labels):
     return testing_accuracy
 
 
+def train_cnn(model):
+
+    # initialize our optimizer and loss function
+    opt = optim.Adam(model.parameters(), lr=INIT_LR)
+    loss_function = nn.CrossEntropyLoss()
+
+    # initialize a dictionary to store training history
+    history = {
+        "train_loss": [],
+        "train_acc": [],
+        "val_loss": [],
+        "val_acc": []
+    }
+    # measure how long training is going to take
+    print("[INFO] training the network...")
+    startTime = time.time()
+
+    # loop over our epochs
+    for e in range(0, EPOCHS):
+
+        # set the model in training mode
+        model.train() 
+
+        # initialize the total training and validation loss
+        totalTrainLoss = 0
+        totalValLoss = 0
+
+        # initialize the number of correct predictions in the training
+        # and validation step
+        trainCorrect = 0
+        valCorrect = 0
+
+        # loop over the training set
+        for x, y in trainDataLoader:
+
+            # send the input to the device
+            x, y = (x.to(DEVICE), y.to(DEVICE))
+
+            # perform a forward pass and calculate the training loss
+            pred = model(x)
+            loss = loss_function(pred, y)
+
+            # zero out the gradients, perform the backpropagation step,
+            # and update the weights
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+
+            # add the loss to the total training loss so far and
+            # calculate the number of correct predictions
+            totalTrainLoss += loss
+            trainCorrect += (pred.argmax(1) == y).type(
+                torch.float).sum().item()
+            
+        # switch off autograd for evaluation
+        with torch.no_grad():
+
+            # set the model in evaluation mode
+            model.eval()
+
+            # loop over the validation set
+            for (x, y) in valDataLoader:
+
+                # send the input to the device
+                (x, y) = (x.to(DEVICE), y.to(DEVICE))
+
+                # make the predictions and calculate the validation loss
+                pred = model(x)
+                totalValLoss += loss_function(pred, y)
+
+                # calculate the number of correct predictions
+                valCorrect += (pred.argmax(1) == y).type(
+                    torch.float).sum().item()
+
+        # calculate the average training and validation loss
+        avgTrainLoss = totalTrainLoss / trainSteps
+        avgValLoss = totalValLoss / valSteps
+
+        # calculate the training and validation accuracy
+        trainCorrect = trainCorrect / len(trainDataLoader.dataset)
+        valCorrect = valCorrect / len(valDataLoader.dataset)
+
+        # update our training history
+        history["train_loss"].append(avgTrainLoss.detach().cpu().numpy())
+        history["train_acc"].append(trainCorrect)
+        history["val_loss"].append(avgValLoss.detach().cpu().numpy())
+        history["val_acc"].append(valCorrect)
+        
+        # print the model training and validation information
+        print("[INFO] EPOCH: {}/{}".format(e + 1, EPOCHS))
+        print("Train loss: {:.6f}, Train accuracy: {:.4f}".format(avgTrainLoss, trainCorrect))
+        print("Val loss: {:.6f}, Val accuracy: {:.4f}\n".format(avgValLoss, valCorrect))
+
+    # finish measuring how long training took
+    endTime = time.time()
+    print("[INFO] total time taken to train the model: {:.2f}s".format(
+        endTime - startTime))
+    
+    return model, history
+
+
+def test_cnn(model, history):
+
+    # turn off autograd for testing evaluation
+    with torch.no_grad():
+        # set the model in evaluation mode
+        model.eval()
+        
+        # initialize a list to store our predictions
+        preds = []
+        # loop over the test set
+        for x, y in testDataLoader:
+            # send the input to the device
+            x = x.to(DEVICE)
+            # make the predictions and add them to the list
+            pred = model(x)
+            preds.extend(pred.argmax(axis=1).cpu().numpy())
+
+    # Generate a classification report
+    print(classification_report(test_dataset.targets.cpu().numpy(),
+        np.array(preds), target_names=test_dataset.classes))
+    
+    # Confusion Matrix
+    cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
+    print(cf_matrix)
+    sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+    
+    # Plot the training loss and accuracy
+    plt.style.use("ggplot")
+    plt.figure()
+    plt.plot(history["train_loss"], label="train_loss")
+    plt.plot(history["val_loss"], label="val_loss")
+    plt.plot(history["train_acc"], label="train_acc")
+    plt.plot(history["val_acc"], label="val_acc")
+    plt.title("Training Loss and Accuracy on Dataset")
+    plt.xlabel("Epoch #")
+    plt.ylabel("Loss/Accuracy")
+    plt.legend(loc="lower left")
+    plt.savefig(f"checkpoint/loss_{TIMESTAMP[:-1]}")
+
+    # Serialize the model to disk
+    torch.save(model, f"checkpoint/epoch{EPOCHS}_{TIMESTAMP[:-1]}.pth")
+
+
 # def predVisualize(i, pred_mask):
 
 #   global mp4, data_url
@@ -199,9 +343,10 @@ if __name__ == "__main__":
 
     folder = "input\\"
 
-    if args.evaluate:
+    if args.inference:
         
-        print("Evaluate Mode: ")
+        print("Inference Mode: ")
+        
 
     else:
 
@@ -227,6 +372,7 @@ if __name__ == "__main__":
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         INIT_LR = 1e-3
         BATCH_SIZE = 16
+        MODEL_INPUT_FRAMES = 15
         EPOCHS = 50
         TRAIN_TEST_SPLIT = 0.9
         TRAIN_VAL_SPLIT = 0.8
@@ -260,16 +406,17 @@ if __name__ == "__main__":
             print("Model: LSTM")
 
             # Train Model.
-            model = LSTM_SR(input_dim=340, hidden_dim=32, num_layers=2, 
+            print("[INFO] initializing the LSTM_SR model...")
+            model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
                             batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
             training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
 
             # Evaluate Model.
+            print("[INFO] evaluating network...")
             test_accuracy = test_lstm(model, X_test, y_test)
             print('Training accuracy is %2.3f :' %(training_accuracy) )
             print('Test accuracy is %2.3f :' %(test_accuracy) )
 
-            # Inference on Test Data.
 
         elif args.model.startswith("cnn"):
 
@@ -285,146 +432,11 @@ if __name__ == "__main__":
             valSteps = len(valDataLoader.dataset) // BATCH_SIZE
             print(f"Train steps: {trainSteps}, Val steps: {valSteps}")
 
-            # Initialize the LeNet model
+            # Train Model.
             print("[INFO] initializing the CNN_SR model...")
             model = CNN_SR(num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
-            
-            # initialize our optimizer and loss function
-            opt = optim.Adam(model.parameters(), lr=INIT_LR)
-            loss_function = nn.CrossEntropyLoss()
+            model, history = train_cnn(model)
 
-            # initialize a dictionary to store training history
-            H = {
-                "train_loss": [],
-                "train_acc": [],
-                "val_loss": [],
-                "val_acc": []
-            }
-            # measure how long training is going to take
-            print("[INFO] training the network...")
-            startTime = time.time()
-
-            # loop over our epochs
-            for e in range(0, EPOCHS):
-
-                # set the model in training mode
-                model.train() 
-
-                # initialize the total training and validation loss
-                totalTrainLoss = 0
-                totalValLoss = 0
-
-                # initialize the number of correct predictions in the training
-                # and validation step
-                trainCorrect = 0
-                valCorrect = 0
-
-                # loop over the training set
-                for x, y in trainDataLoader:
-
-                    # send the input to the device
-                    x, y = (x.to(DEVICE), y.to(DEVICE))
-
-                    # perform a forward pass and calculate the training loss
-                    pred = model(x)
-                    loss = loss_function(pred, y)
-
-                    # zero out the gradients, perform the backpropagation step,
-                    # and update the weights
-                    opt.zero_grad()
-                    loss.backward()
-                    opt.step()
-
-                    # add the loss to the total training loss so far and
-                    # calculate the number of correct predictions
-                    totalTrainLoss += loss
-                    trainCorrect += (pred.argmax(1) == y).type(
-                        torch.float).sum().item()
-                    
-                # switch off autograd for evaluation
-                with torch.no_grad():
-
-                    # set the model in evaluation mode
-                    model.eval()
-
-                    # loop over the validation set
-                    for (x, y) in valDataLoader:
-
-                        # send the input to the device
-                        (x, y) = (x.to(DEVICE), y.to(DEVICE))
-
-                        # make the predictions and calculate the validation loss
-                        pred = model(x)
-                        totalValLoss += loss_function(pred, y)
-
-                        # calculate the number of correct predictions
-                        valCorrect += (pred.argmax(1) == y).type(
-                            torch.float).sum().item()
-
-                # calculate the average training and validation loss
-                avgTrainLoss = totalTrainLoss / trainSteps
-                avgValLoss = totalValLoss / valSteps
-
-                # calculate the training and validation accuracy
-                trainCorrect = trainCorrect / len(trainDataLoader.dataset)
-                valCorrect = valCorrect / len(valDataLoader.dataset)
-
-                # update our training history
-                H["train_loss"].append(avgTrainLoss)
-                H["train_acc"].append(trainCorrect)
-                H["val_loss"].append(avgValLoss)
-                H["val_acc"].append(valCorrect)
-                
-                # print the model training and validation information
-                print("[INFO] EPOCH: {}/{}".format(e + 1, EPOCHS))
-                print("Train loss: {:.6f}, Train accuracy: {:.4f}".format(avgTrainLoss, trainCorrect))
-                print("Val loss: {:.6f}, Val accuracy: {:.4f}\n".format(avgValLoss, valCorrect))
-
-            # finish measuring how long training took
-            endTime = time.time()
-            print("[INFO] total time taken to train the model: {:.2f}s".format(
-                endTime - startTime))
-            
-            # we can now evaluate the network on the test set
+            # Evaluate Model.
             print("[INFO] evaluating network...")
-
-            # turn off autograd for testing evaluation
-            with torch.no_grad():
-                # set the model in evaluation mode
-                model.eval()
-                
-                # initialize a list to store our predictions
-                preds = []
-                # loop over the test set
-                for x, y in testDataLoader:
-                    # send the input to the device
-                    x = x.to(DEVICE)
-                    # make the predictions and add them to the list
-                    pred = model(x)
-                    preds.extend(pred.argmax(axis=1).cpu().numpy())
-
-            # Generate a classification report
-            print(test_dataset.targets.cpu().numpy())
-            print(classification_report(test_dataset.targets.cpu().numpy(),
-                np.array(preds), target_names=test_dataset.classes))
-            
-            # Confusion Matrix
-            cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
-            print(cf_matrix)
-            sns.heatmap(cf_matrix, annot=True, cmap='Blues')
-            
-            # Plot the training loss and accuracy
-            plt.style.use("ggplot")
-            plt.figure()
-            plt.plot(H["train_loss"], label="train_loss")
-            plt.plot(H["val_loss"], label="val_loss")
-            plt.plot(H["train_acc"], label="train_acc")
-            plt.plot(H["val_acc"], label="val_acc")
-            plt.title("Training Loss and Accuracy on Dataset")
-            plt.xlabel("Epoch #")
-            plt.ylabel("Loss/Accuracy")
-            plt.legend(loc="lower left")
-            plt.savefig(args["plot"])
-
-            # Serialize the model to disk
-            torch.save(model, args["model"])
+            test_cnn(model, history)

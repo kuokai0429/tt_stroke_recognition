@@ -226,14 +226,20 @@ def prepareData_csv(model_input_frames):
             for index, row in df.iterrows():
                 
                 start, end, sc = row['start'], row['end'], row['label']
+
+                # Skip the stroke annotation data if (stroke length < model input frames)
+                if (end - start) < model_input_frames: 
+                    continue
+
                 step = (end - start) // model_input_frames
                 extra = (end - start) % model_input_frames
                 # print("frame range:", start, end)
                 # print("(step, extra):", step, extra)
                 # print("total extra data:", end - range(start, end, step)[model_input_frames-1] - 1, end="\n")
 
-                # Preparing train data for stroke classes from 1~4 
+                # Preparing train data for stroke classes from 1 ~ 4 
                 for z in range(end - range(start, end, step)[model_input_frames-1]):
+                        
                         for count, i in enumerate(range(start+z, end, step)):
 
                             if count == model_input_frames: break
@@ -243,9 +249,23 @@ def prepareData_csv(model_input_frames):
                             
                         train_label.append([stroke_class[sc]])
 
-                # Preparing train data for stroke class 0
-                
+                # Preparing train data for stroke class 0 from [window_tail ~ window_center] and [window_center ~ window_head]
+                if (start - model_input_frames < 1) or (end + model_input_frames > len(keypoints_2d)):
+                    continue
+                else:
+                    for x in range(int((model_input_frames - 1) / 2)):
 
+                        # window_tail ~ window_center
+                        for y in range(model_input_frames):
+                            keypoints_frame.append([keypoints_2d[start - model_input_frames + x + y], start - model_input_frames + x + y])
+                            train.append(keypoints_2d[start - model_input_frames + x + y])
+                        train_label.append([stroke_class["其他"]])
+
+                        # window_center ~ window_head
+                        for y in range(model_input_frames):
+                            keypoints_frame.append([keypoints_2d[end + model_input_frames + x + y], end + model_input_frames + x + y])
+                            train.append(keypoints_2d[end + model_input_frames + x + y])
+                        train_label.append([stroke_class["其他"]])
 
             print(f'Number of Train features/labels: {len(train)}/{len(train_label)}')
             keypoints_frame_all[filename] = np.asarray(keypoints_frame, dtype=object)
@@ -305,7 +325,7 @@ if __name__ == "__main__":
     elif args.mode.startswith("annotation"):
 
         # Prepare Training Data
-        model_input_frames = 10
+        model_input_frames = 15
         # X_All, y_All, kf, tf = prepareData_txt("m1_right", model_input_frames)
         X_All, y_All, kfa, fla = prepareData_csv(model_input_frames)
         print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
@@ -316,13 +336,13 @@ if __name__ == "__main__":
             src = args.mode.rsplit('-')[-1]
             showLandmarks(kfa[f'{src}_right'], fla[f'{src}_right'], folder, src, "right")
 
-        # # Convert Training Data to Pytorch Tensor
-        # X_All = torch.FloatTensor(X_All).view(-1, 1, 17 * model_input_frames * 2)
-        # y_All = torch.LongTensor(y_All).view(-1)
-        # print(type(X_All), type(y_All))
-        # print(X_All.shape, y_All.shape)
+        # Convert Training Data to Pytorch Tensor
+        X_All = torch.FloatTensor(X_All).view(-1, 1, model_input_frames * 17 * 2)
+        y_All = torch.LongTensor(y_All).view(-1)
+        print(type(X_All), type(y_All))
+        print(X_All.shape, y_All.shape)
 
-        # # Save Traing Data to pickle
-        # for k, v in [('X_All', X_All), ('y_All', y_All)]:
-        #     with open(f'{folder}{k}.pkl', 'wb') as f:
-        #         pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+        # Save Traing Data to pickle
+        for k, v in [('X_All', X_All), ('y_All', y_All)]:
+            with open(f'{folder}{k}.pkl', 'wb') as f:
+                pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)

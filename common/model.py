@@ -43,15 +43,15 @@ class CNN_SR(nn.Module):
     def __init__(self, num_classes):
 
         super(CNN_SR, self).__init__()
-        self.conv1 = nn.Conv1d(1, 16, kernel_size=3, stride=1) # (16, 1, 340)
-        # self.norm1 = nn.LayerNorm([16, 1, 338]) # [B, H, W]
-        self.conv2 = nn.Conv1d(16, 32, kernel_size=3, stride=1) # (32, 1, 338)
-        self.conv3 = nn.Conv1d(32, 64, kernel_size=3, stride=1) # (64, 1, 336)
+        self.conv1 = nn.Conv1d(1, 16, kernel_size=3, stride=1) # (16, 1, 17*2*window)
+        # self.norm1 = nn.LayerNorm([16, 1, ]) # [B, H, W]
+        self.conv2 = nn.Conv1d(16, 32, kernel_size=3, stride=1) # (32, 1, )
+        self.conv3 = nn.Conv1d(32, 64, kernel_size=3, stride=1) # (64, 1, )
         self.conv4 = nn.Conv1d(64, 64, kernel_size=4, stride=2) # (64, 1, )
-        # self.norm2 = nn.LayerNorm([64, 1, 166])
+        # self.norm2 = nn.LayerNorm([64, 1, ])
         self.conv5 = nn.Conv1d(64, 128, kernel_size=4, stride=2) # (128, 1, )
         self.conv6 = nn.Conv1d(128, 128, kernel_size=4, stride=2) # (128, 1, )
-        self.fc1 = nn.Linear(5120, 64)
+        self.fc1 = nn.Linear(7808, 64)
         self.fc2 = nn.Linear(64, num_classes)
 
         self.relu = nn.ReLU()           
