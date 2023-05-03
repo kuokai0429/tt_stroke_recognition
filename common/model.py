@@ -43,7 +43,7 @@ class CNN_SR(nn.Module):
     def __init__(self, num_classes):
 
         super(CNN_SR, self).__init__()
-        self.conv1 = nn.Conv1d(1, 16, kernel_size=3, stride=1) # (16, 1, 17*2*window)
+        self.conv1 = nn.Conv1d(1, 16, kernel_size=3, stride=1) # (16, 1, 17 * 2 * window)
         # self.norm1 = nn.LayerNorm([16, 1, ]) # [B, H, W]
         self.conv2 = nn.Conv1d(16, 32, kernel_size=3, stride=1) # (32, 1, )
         self.conv3 = nn.Conv1d(32, 64, kernel_size=3, stride=1) # (64, 1, )

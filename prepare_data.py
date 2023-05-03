@@ -19,9 +19,13 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
 
+# Argument Parser
 parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--mode', default="video", required=True, type=str, help="Mode.")
 args = parser.parse_args()
+
+# Define training data hyperparameters
+MODEL_INPUT_FRAMES = 15
 
 
 def getVideoInfo(filepath):
@@ -325,9 +329,8 @@ if __name__ == "__main__":
     elif args.mode.startswith("annotation"):
 
         # Prepare Training Data
-        model_input_frames = 15
-        # X_All, y_All, kf, tf = prepareData_txt("m1_right", model_input_frames)
-        X_All, y_All, kfa, fla = prepareData_csv(model_input_frames)
+        # X_All, y_All, kf, tf = prepareData_txt("m1_right", MODEL_INPUT_FRAMES)
+        X_All, y_All, kfa, fla = prepareData_csv(MODEL_INPUT_FRAMES)
         print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
         print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
@@ -337,7 +340,7 @@ if __name__ == "__main__":
             showLandmarks(kfa[f'{src}_right'], fla[f'{src}_right'], folder, src, "right")
 
         # Convert Training Data to Pytorch Tensor
-        X_All = torch.FloatTensor(X_All).view(-1, 1, model_input_frames * 17 * 2)
+        X_All = torch.FloatTensor(X_All).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
         y_All = torch.LongTensor(y_All).view(-1)
         print(type(X_All), type(y_All))
         print(X_All.shape, y_All.shape)

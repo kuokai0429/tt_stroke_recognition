@@ -173,7 +173,7 @@ def test_lstm(model, test_features, test_labels):
     return testing_accuracy
 
 
-def train_cnn(model):
+def train_cnn(model, trainDataLoader, valDataLoader, trainSteps, valSteps):
 
     # initialize our optimizer and loss function
     opt = optim.Adam(model.parameters(), lr=INIT_LR)
@@ -274,7 +274,7 @@ def train_cnn(model):
     return model, history
 
 
-def test_cnn(model, history):
+def test_cnn(model, history, testDataLoader):
 
     # turn off autograd for testing evaluation
     with torch.no_grad():
@@ -384,7 +384,8 @@ if __name__ == "__main__":
 
             stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
 
-            # Load human pose estimation keypoints
+            ## Load human pose estimation keypoints
+
             filename = args.HPE_keypoints
             loaded_keypoints_2d = np.load(filename, encoding='latin1', allow_pickle=True)
             # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
@@ -393,32 +394,67 @@ if __name__ == "__main__":
             print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
             keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
 
-            # Load model
+            ## Load model weights
+
             print("[INFO] initializing the CNN_SR model...")
             model = CNN_SR(num_classes=len(StrokeRecognitionDataset().classes)).to(DEVICE)
             model.load_state_dict(torch.load(args.checkpoint))
             model.eval()
 
-            # Predict stroke classes on each frame with different window stride.
+            ## Predict stroke classes on each frame with different window stride.
+            
             stride = [1, 3, 5]
-            for i in range(1, int(len(keypoints_2d) + 1 - MODEL_INPUT_FRAMES))[:3]:
 
-                print(f"--------------------- Frame {i} --------------------- ")
+            # Version 1: Predicting from first frame.
+            # for i in range(1, int(len(keypoints_2d) + 1 - MODEL_INPUT_FRAMES))[:3]:
+
+            #     print(f"--------------------- Frame {i} --------------------- ")
+            #     pred = []
+
+            #     for s in stride:
+
+            #         window_range = range(i, i + (MODEL_INPUT_FRAMES * s) - (s - 1), s)
+            #         window_frames = []
+            #         print(f"Stride {s} (len{len(window_range)}): ", end="")
+
+            #         for j in window_range:
+
+            #             print(j, end=" ")
+            #             window_frames.append(keypoints_2d[j])
+
+            #         X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
+            #         X_features = X_features.to(DEVICE)
+            #         pred.append(model(X_features))
+
+            #     print(pred) # argmax(1).detach().cpu().numpy()
+
+            # Version 2: Predicting from mid frame.
+            pred = []
+            for i in range(1 + int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2], 
+                           len(keypoints_2d) + 1 - int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2])[:3]:
+
+                print(f"\n--------------------- Frame {i} ---------------------")
+                pred_temp = []
 
                 for s in stride:
-
-                    window_range = range(i, i + (MODEL_INPUT_FRAMES * s) - (s - 1), s)
-                    print(f"Stride {s} (len{len(window_range)}): ", end="")
+            
+                    window_range = range(i - int((MODEL_INPUT_FRAMES - 1) / 2) * s, i + 1 + int((MODEL_INPUT_FRAMES - 1) / 2) * s, s)
+                    window_frames = []
+                    print(f"\nStride {s} (len{len(window_range)}): ")
 
                     for j in window_range:
 
                         print(j, end=" ")
+                        window_frames.append(keypoints_2d[j])
 
+                    X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
+                    X_features = X_features.to(DEVICE)
+                    pred_temp.append(model(X_features))
 
-                    print()
+                pred_temp = np.array([t.detach().cpu().numpy() for t in pred_temp])
+                pred_temp = np.mean(pred_temp, axis=0) # column-wise mean
+                print(f"\n{pred_temp.argmax(1)}") # 
 
-                print()
-                        
 
     else:
 
@@ -494,8 +530,8 @@ if __name__ == "__main__":
             # Train Model.
             print("[INFO] initializing the CNN_SR model...")
             model = CNN_SR(num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
-            model, history = train_cnn(model)
+            model, history = train_cnn(model, trainDataLoader, valDataLoader, trainSteps, valSteps)
 
             # Evaluate Model.
             print("[INFO] evaluating network...")
-            test_cnn(model, history)
+            test_cnn(model, history, testDataLoader)
