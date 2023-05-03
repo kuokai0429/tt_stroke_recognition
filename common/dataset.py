@@ -2,7 +2,7 @@
 
 class StrokeRecognitionDataset:
 
-    def __init__(self, features, targets):
+    def __init__(self, features=None, targets=None):
 
         self.features = features
         self.targets = targets

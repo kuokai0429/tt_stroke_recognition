@@ -31,11 +31,25 @@ from common.model import CNN_SR
 from common.dataset import StrokeRecognitionDataset
 
 
+# Argument Parser
 parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
 parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
 parser.add_argument('--inference', action='store_true', help='Inference Mode.')
+parser.add_argument('--checkpoint', default='checkpoint/epoch50_20230503T15-05-00.pth', help='Human Pose Estimation Keypoints.')
+parser.add_argument('--HPE_keypoints', default='input/cropped_f1_right.npz', help='Human Pose Estimation Keypoints.')
 args = parser.parse_args()
+
+# Define training hyperparameters
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+INIT_LR = 1e-3
+BATCH_SIZE = 16
+MODEL_INPUT_FRAMES = 15
+EPOCHS = 50
+TRAIN_TEST_SPLIT = 0.9
+TRAIN_VAL_SPLIT = 0.8
+SEED = 0
+SOURCE_FOLDER = "input\\"
 
 
 def init_seed(seed):
@@ -264,15 +278,19 @@ def test_cnn(model, history):
 
     # turn off autograd for testing evaluation
     with torch.no_grad():
+
         # set the model in evaluation mode
         model.eval()
         
         # initialize a list to store our predictions
         preds = []
+
         # loop over the test set
         for x, y in testDataLoader:
+
             # send the input to the device
             x = x.to(DEVICE)
+
             # make the predictions and add them to the list
             pred = model(x)
             preds.extend(pred.argmax(axis=1).cpu().numpy())
@@ -283,10 +301,10 @@ def test_cnn(model, history):
     
     # Confusion Matrix
     cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
-    print(cf_matrix)
     svm = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
     figure = svm.get_figure()    
     figure.savefig(f'checkpoint/confusion_matrix_{TIMESTAMP[:-1]}.png', dpi=400)
+    print(cf_matrix)
     
     # Plot the training loss and accuracy
     plt.style.use("ggplot")
@@ -302,7 +320,7 @@ def test_cnn(model, history):
     plt.savefig(f"checkpoint/loss_{TIMESTAMP[:-1]}")
 
     # Serialize the model to disk
-    torch.save(model, f"checkpoint/epoch{EPOCHS}_{TIMESTAMP[:-1]}.pth")
+    torch.save(model.state_dict(), f"checkpoint/epoch{EPOCHS}_{TIMESTAMP[:-1]}.pth")
 
 
 # def predVisualize(i, pred_mask):
@@ -343,12 +361,64 @@ def test_cnn(model, history):
 
 if __name__ == "__main__":
 
-    folder = "input\\"
+    # Set up random seed on everything
+    init_seed(SEED)
 
     if args.inference:
         
         print("Inference Mode: ")
-        
+
+        if args.model.startswith("lstm"):
+
+            print("Model: LSTM")
+
+            print("[INFO] initializing the LSTM_SR model...")
+            model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
+                            batch_size=BATCH_SIZE, num_classes=len(StrokeRecognitionDataset().dataset.classes)).to(DEVICE)
+            model.load_state_dict(torch.load(args.checkpoint))
+            model.eval()
+
+        elif args.model.startswith("cnn"):
+
+            print("Model: CNN")
+
+            stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
+
+            # Load human pose estimation keypoints
+            filename = args.HPE_keypoints
+            loaded_keypoints_2d = np.load(filename, encoding='latin1', allow_pickle=True)
+            # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
+            print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
+            print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
+            print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
+            keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+
+            # Load model
+            print("[INFO] initializing the CNN_SR model...")
+            model = CNN_SR(num_classes=len(StrokeRecognitionDataset().classes)).to(DEVICE)
+            model.load_state_dict(torch.load(args.checkpoint))
+            model.eval()
+
+            # Predict stroke classes on each frame with different window stride.
+            stride = [1, 3, 5]
+            for i in range(1, int(len(keypoints_2d) + 1 - MODEL_INPUT_FRAMES))[:3]:
+
+                print(f"--------------------- Frame {i} --------------------- ")
+
+                for s in stride:
+
+                    window_range = range(i, i + (MODEL_INPUT_FRAMES * s) - (s - 1), s)
+                    print(f"Stride {s} (len{len(window_range)}): ", end="")
+
+                    for j in window_range:
+
+                        print(j, end=" ")
+
+
+                    print()
+
+                print()
+                        
 
     else:
 
@@ -370,22 +440,9 @@ if __name__ == "__main__":
         print("CUDA Device Count: ", torch.cuda.device_count())
         print(args)
 
-        # Define training hyperparameters
-        DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        INIT_LR = 1e-3
-        BATCH_SIZE = 16
-        MODEL_INPUT_FRAMES = 15
-        EPOCHS = 50
-        TRAIN_TEST_SPLIT = 0.9
-        TRAIN_VAL_SPLIT = 0.8
-        SEED = 0
-
-        # Set up random seed on everything
-        init_seed(SEED)
-
         # Fetch Training Data.
         print("[INFO] Fetching Data...")
-        X_All, y_All = getTrainData(folder)[0], getTrainData(folder)[1]
+        X_All, y_All = getTrainData(SOURCE_FOLDER)[0], getTrainData(SOURCE_FOLDER)[1]
         print(X_All.shape, y_All.shape)
 
         # Calculate the train/validation split
