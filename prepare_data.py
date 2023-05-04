@@ -248,8 +248,8 @@ def prepareData_csv(model_input_frames):
 
                             if count == model_input_frames: break
 
-                            keypoints_frame.append([keypoints_2d[i], i])
-                            train.append(keypoints_2d[i])
+                            keypoints_frame.append([keypoints_2d[i-1], i-1])
+                            train.append(keypoints_2d[i-1])
                             
                         train_label.append([stroke_class[sc]])
 
@@ -261,14 +261,14 @@ def prepareData_csv(model_input_frames):
 
                         # window_tail ~ window_center
                         for y in range(model_input_frames):
-                            keypoints_frame.append([keypoints_2d[start - model_input_frames + x + y], start - model_input_frames + x + y])
-                            train.append(keypoints_2d[start - model_input_frames + x + y])
+                            keypoints_frame.append([keypoints_2d[start - model_input_frames + x + y - 1], start - model_input_frames + x + y - 1])
+                            train.append(keypoints_2d[start - model_input_frames + x + y - 1])
                         train_label.append([stroke_class["其他"]])
 
                         # window_center ~ window_head
                         for y in range(model_input_frames):
-                            keypoints_frame.append([keypoints_2d[end + model_input_frames + x + y], end + model_input_frames + x + y])
-                            train.append(keypoints_2d[end + model_input_frames + x + y])
+                            keypoints_frame.append([keypoints_2d[end + model_input_frames + x + y - 1], end + model_input_frames + x + y - 1])
+                            train.append(keypoints_2d[end + model_input_frames + x + y - 1])
                         train_label.append([stroke_class["其他"]])
 
             print(f'Number of Train features/labels: {len(train)}/{len(train_label)}')

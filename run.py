@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import cv2
 import seaborn as sns
 import pandas as pd
+from tqdm import tqdm
 
 import torch
 from torch.utils.data import random_split
@@ -402,22 +403,23 @@ if __name__ == "__main__":
         ## Predict stroke classes on each frame with different window stride (mid frame of window).
 
         stride, pred_result = [1, 3, 5], [0] * (len(keypoints_2d) + 1)
-        for i in range(1 + int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2], 
-                        len(keypoints_2d) + 1 - int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2])[:100]:
+        temp = int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2]
 
-            print(f"\n--------------------- Frame {i} ---------------------")
+        for i in tqdm(range(1 + temp, len(keypoints_2d) + 1 - temp)[:]):
+
+            # print(f"\n--------------------- Frame {i} ---------------------")
             pred_temp = []
 
             for s in stride:
         
                 window_range = range(i - int((MODEL_INPUT_FRAMES - 1) / 2) * s, i + 1 + int((MODEL_INPUT_FRAMES - 1) / 2) * s, s)
                 window_frames = []
-                print(f"\nStride {s} (len{len(window_range)}): ")
+                # print(f"\nStride {s} (len{len(window_range)}): ")
 
                 for j in window_range:
 
-                    print(j, end=" ")
-                    window_frames.append(keypoints_2d[j])
+                    # print(j, end=" ")
+                    window_frames.append(keypoints_2d[j-1])
 
                 X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
                 X_features = X_features.to(DEVICE)
@@ -426,10 +428,12 @@ if __name__ == "__main__":
             pred_temp = np.array([t.detach().cpu().numpy() for t in pred_temp])
             pred_temp = np.mean(pred_temp, axis=0) # column-wise mean
             pred_result[i] = np.array(pred_temp.argmax(1)[0])
-            print(f"\n{pred_temp.argmax(1)}")
+            # print(f"\n{pred_temp.argmax(1)}")
 
         pred_result = np.array(pred_result)
-        print(f"\nPredicted Segments: {pred_result.shape}")
+        count_pred_result = [np.count_nonzero(pred_result == 0), np.count_nonzero(pred_result == 1), 
+               np.count_nonzero(pred_result == 2), np.count_nonzero(pred_result == 3), np.count_nonzero(pred_result == 4)]
+        print(f"\nPredicted Segments: {np.unique(pred_result), count_pred_result}")
     
 
         ## Prepare Ground Truth Segments
@@ -444,43 +448,48 @@ if __name__ == "__main__":
                 ground_truth[i] = stroke_class[sc]
 
         ground_truth = np.array(ground_truth)
-        print(f"Ground Truth Segments: {ground_truth.shape}")
+        count_ground_truth = [np.count_nonzero(ground_truth == 0), np.count_nonzero(ground_truth == 1), 
+               np.count_nonzero(ground_truth == 2), np.count_nonzero(ground_truth == 3), np.count_nonzero(ground_truth == 4)]
+        print(f"Ground Truth Segments: {np.unique(ground_truth), count_ground_truth}")
 
 
-        ## Plot the predicted segments compared with the ground-truth segments
+        ## Plot the predicted segments compared with the ground-truth segments 
+        ## (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
         facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
-        gt_barh, pred_barh, gt_facecolors, pred_facecolors = [], [], ['tab:grey'] * (len(keypoints_2d) + 1), ['tab:grey'] * (len(keypoints_2d) + 1)
+        gt_barh, pred_barh, gt_facecolors, pred_facecolors = [], [], [], []
 
-        for target in [(ground_truth, gt_barh, gt_facecolors), (pred_result, pred_barh, pred_facecolors)]:
+        for target in [(ground_truth, gt_barh, gt_facecolors, 'Ground Truth barh'), (pred_result, pred_barh, pred_facecolors, 'Predicted barh')]:
 
-            pre_i, pre_class, length = 1, target[0][1], 1
+            # print(f"\n--------------------- {target[3]} ---------------------")
+
+            pre_startframe, pre_class, length = 1, target[0][1], 1
             for i in range(1, len(keypoints_2d) + 1):
 
                 if target[0][i] == pre_class:
                     length += 1
                 else:
-                    print((pre_i, length), facecolors_stroke_class[pre_class])
-                    target[1].append((pre_i, length))
-                    target[2][i] = facecolors_stroke_class[pre_class]
-                    length = 1
+                    target[1].append((pre_startframe, length))
+                    target[2].append(facecolors_stroke_class[pre_class])
+                    pre_startframe, length = i, 1
+
+                    # print((pre_startframe, length), facecolors_stroke_class[pre_class])
 
                 pre_class = target[0][i]
-                pre_i = i
 
-        print(f"gt_barh length: {len(gt_barh)}")
+        print(f"\ngt_barh length: {len(gt_barh)}")
         print(f"gt_facecolors length: {len(gt_facecolors)}")
         print(f"pred_barh length: {len(pred_barh)}")
         print(f"pred_facecolors length: {len(pred_facecolors)}")
 
         plt.style.use("ggplot")
         fig, ax = plt.subplots(figsize=(17,6))
-        ax.broken_barh(gt_barh, (11, 8), facecolors=gt_facecolors)
-        ax.broken_barh(pred_barh, (21, 8), facecolors=pred_facecolors)
+        ax.broken_barh(pred_barh, (11, 8), facecolors=pred_facecolors)
+        ax.broken_barh(gt_barh, (21, 8), facecolors=gt_facecolors)
         ax.set_ylim(5, 35)
-        ax.set_xlim(0, len(keypoints_2d) + 1)
-        ax.set_xlabel(f'frames since start ( total frames {len(keypoints_2d) + 1} )')
+        ax.set_xlim(0, len(keypoints_2d))
+        ax.set_xlabel(f'frames since start ( total frames {len(keypoints_2d)} )')
         ax.set_yticks([15, 25])
         ax.set_yticklabels(['Predicted Segments', 'Ground Truth Segments'])     
         ax.grid(True)   
