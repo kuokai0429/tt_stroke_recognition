@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import seaborn as sns
+import pandas as pd
 
 import torch
 from torch.utils.data import random_split
@@ -36,8 +37,9 @@ parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
 parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
 parser.add_argument('--inference', action='store_true', help='Inference Mode.')
-parser.add_argument('--checkpoint', default='checkpoint/epoch50_20230503T15-05-00.pth', help='Human Pose Estimation Keypoints.')
-parser.add_argument('--HPE_keypoints', default='input/cropped_f1_right.npz', help='Human Pose Estimation Keypoints.')
+parser.add_argument('--checkpoint', default='checkpoint/epoch50_20230503T15-05-00.pth', help='Stroke Recognition Model Weight.')
+parser.add_argument('--keypoints', default='input/cropped_f1_right.npz', help='Human Pose Estimation Keypoints.')
+parser.add_argument('--gt', default='annotation/f1_right.csv', help='Stroke Segments Ground Truth.')
 args = parser.parse_args()
 
 # Define training hyperparameters
@@ -274,7 +276,7 @@ def train_cnn(model, trainDataLoader, valDataLoader, trainSteps, valSteps):
     return model, history
 
 
-def test_cnn(model, history, testDataLoader):
+def test_cnn(model, history, testDataLoader, test_dataset):
 
     # turn off autograd for testing evaluation
     with torch.no_grad():
@@ -323,40 +325,33 @@ def test_cnn(model, history, testDataLoader):
     torch.save(model.state_dict(), f"checkpoint/epoch{EPOCHS}_{TIMESTAMP[:-1]}.pth")
 
 
-# def predVisualize(i, pred_mask):
+def predVisualize(i, filepath, pred_mask):
 
-#   global mp4, data_url
+    cap = cv2.VideoCapture(filepath)
+    output = cv2.VideoWriter('PredictionResult_' + str(i) + '.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
+                float(30), (int(cap.get(3)), int(cap.get(4))))
+    classes = ['Forehand Drive', 'Backhand Drive', 'Backhand Push', 'None']
+    color = [(255, 0, 0), (0, 100, 0), (0, 0, 255), (0, 0, 0)]
 
-#   cap = cv2.VideoCapture("/content/gdrive/MyDrive/專題, 論文, 實驗室/高中夏令營 - AI4kids/學生影片/student_TrainData/1/20220811_161414/openpose/media/output.avi")
-#   output = cv2.VideoWriter('PredictionResult_' + str(i) + '.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
-#                float(30), (int(cap.get(3)), int(cap.get(4))))
-#   classes = ['Forehand Drive', 'Backhand Drive', 'Backhand Push', 'None']
-#   color = [(255, 0, 0), (0, 100, 0), (0, 0, 255), (0, 0, 0)]
-
-#   count = 0
-#   while(cap.isOpened()):
-      
-#       count += 1
-#       ret, frame = cap.read()
-      
-#       if ret == True:
-#         cv2.rectangle(frame, (40, 10), (1000, 60), (255, 255, 255), -1, cv2.LINE_AA)
-#         # cv2.putText(frame, "Frame: " + str(count) + " Predictions: " + str(classes[pred[i-1][0][0]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
-#         #       1.5, (0, 0, 0), 5, cv2.LINE_4)
-#         cv2.putText(frame, "Predictions: " + str(classes[pred_mask[count-1]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
-#               1.5, color[pred_mask[count-1]], 5, cv2.LINE_4)
+    count = 0
+    while(cap.isOpened()):
         
-#         output.write(frame)
-#       else:
-#         break 
+        count += 1
+        ret, frame = cap.read()
+        
+        if ret == True:
+            cv2.rectangle(frame, (40, 10), (1000, 60), (255, 255, 255), -1, cv2.LINE_AA)
+            # cv2.putText(frame, "Frame: " + str(count) + " Predictions: " + str(classes[pred[i-1][0][0]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+            #       1.5, (0, 0, 0), 5, cv2.LINE_4)
+            cv2.putText(frame, "Predictions: " + str(classes[pred_mask[count-1]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                1.5, color[pred_mask[count-1]], 5, cv2.LINE_4)
+            
+            output.write(frame)
+        else:
+            break 
 
-#   cap.release()
-#   output.release()
-
-#   !ffmpeg -i PredictionResult_{i}.avi PredictionResult_{i}.mp4
-
-#   mp4 = open('PredictionResult_' + str(i) + '.mp4','rb').read()
-#   data_url = "data:video/mp4;base64," + b64encode(mp4).decode()
+    cap.release()
+    output.release()
 
 
 if __name__ == "__main__":
@@ -367,6 +362,8 @@ if __name__ == "__main__":
     if args.inference:
         
         print("Inference Mode: ")
+
+        TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
 
         if args.model.startswith("lstm"):
 
@@ -382,11 +379,11 @@ if __name__ == "__main__":
 
             print("Model: CNN")
 
-            stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
+            stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
 
             ## Load human pose estimation keypoints
 
-            filename = args.HPE_keypoints
+            filename = args.keypoints
             loaded_keypoints_2d = np.load(filename, encoding='latin1', allow_pickle=True)
             # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
             print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
@@ -401,66 +398,106 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(args.checkpoint))
             model.eval()
 
-            ## Predict stroke classes on each frame with different window stride.
-            
-            stride = [1, 3, 5]
 
-            # Version 1: Predicting from first frame.
-            # for i in range(1, int(len(keypoints_2d) + 1 - MODEL_INPUT_FRAMES))[:3]:
+        ## Predict stroke classes on each frame with different window stride (mid frame of window).
 
-            #     print(f"--------------------- Frame {i} --------------------- ")
-            #     pred = []
+        stride, pred_result = [1, 3, 5], [0] * (len(keypoints_2d) + 1)
+        for i in range(1 + int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2], 
+                        len(keypoints_2d) + 1 - int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2])[:100]:
 
-            #     for s in stride:
+            print(f"\n--------------------- Frame {i} ---------------------")
+            pred_temp = []
 
-            #         window_range = range(i, i + (MODEL_INPUT_FRAMES * s) - (s - 1), s)
-            #         window_frames = []
-            #         print(f"Stride {s} (len{len(window_range)}): ", end="")
+            for s in stride:
+        
+                window_range = range(i - int((MODEL_INPUT_FRAMES - 1) / 2) * s, i + 1 + int((MODEL_INPUT_FRAMES - 1) / 2) * s, s)
+                window_frames = []
+                print(f"\nStride {s} (len{len(window_range)}): ")
 
-            #         for j in window_range:
+                for j in window_range:
 
-            #             print(j, end=" ")
-            #             window_frames.append(keypoints_2d[j])
+                    print(j, end=" ")
+                    window_frames.append(keypoints_2d[j])
 
-            #         X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
-            #         X_features = X_features.to(DEVICE)
-            #         pred.append(model(X_features))
+                X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
+                X_features = X_features.to(DEVICE)
+                pred_temp.append(model(X_features))
 
-            #     print(pred) # argmax(1).detach().cpu().numpy()
+            pred_temp = np.array([t.detach().cpu().numpy() for t in pred_temp])
+            pred_temp = np.mean(pred_temp, axis=0) # column-wise mean
+            pred_result[i] = np.array(pred_temp.argmax(1)[0])
+            print(f"\n{pred_temp.argmax(1)}")
 
-            # Version 2: Predicting from mid frame.
-            pred = []
-            for i in range(1 + int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2], 
-                           len(keypoints_2d) + 1 - int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2])[:3]:
+        pred_result = np.array(pred_result)
+        print(f"\nPredicted Segments: {pred_result.shape}")
+    
 
-                print(f"\n--------------------- Frame {i} ---------------------")
-                pred_temp = []
+        ## Prepare Ground Truth Segments
 
-                for s in stride:
-            
-                    window_range = range(i - int((MODEL_INPUT_FRAMES - 1) / 2) * s, i + 1 + int((MODEL_INPUT_FRAMES - 1) / 2) * s, s)
-                    window_frames = []
-                    print(f"\nStride {s} (len{len(window_range)}): ")
+        ground_truth = [0] * (len(keypoints_2d) + 1)
+        df = pd.read_csv(args.gt, encoding='utf8')
+        
+        for index, row in df.iterrows():
+            start, end, sc = row['start'], row['end'], row['label']
 
-                    for j in window_range:
+            for i in range(start, end + 1):
+                ground_truth[i] = stroke_class[sc]
 
-                        print(j, end=" ")
-                        window_frames.append(keypoints_2d[j])
+        ground_truth = np.array(ground_truth)
+        print(f"Ground Truth Segments: {ground_truth.shape}")
 
-                    X_features = torch.FloatTensor(window_frames).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
-                    X_features = X_features.to(DEVICE)
-                    pred_temp.append(model(X_features))
 
-                pred_temp = np.array([t.detach().cpu().numpy() for t in pred_temp])
-                pred_temp = np.mean(pred_temp, axis=0) # column-wise mean
-                print(f"\n{pred_temp.argmax(1)}") # 
+        ## Plot the predicted segments compared with the ground-truth segments
 
+        stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
+        facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
+        gt_barh, pred_barh, gt_facecolors, pred_facecolors = [], [], ['tab:grey'] * (len(keypoints_2d) + 1), ['tab:grey'] * (len(keypoints_2d) + 1)
+
+        for target in [(ground_truth, gt_barh, gt_facecolors), (pred_result, pred_barh, pred_facecolors)]:
+
+            pre_i, pre_class, length = 1, target[0][1], 1
+            for i in range(1, len(keypoints_2d) + 1):
+
+                if target[0][i] == pre_class:
+                    length += 1
+                else:
+                    print((pre_i, length), facecolors_stroke_class[pre_class])
+                    target[1].append((pre_i, length))
+                    target[2][i] = facecolors_stroke_class[pre_class]
+                    length = 1
+
+                pre_class = target[0][i]
+                pre_i = i
+
+        print(f"gt_barh length: {len(gt_barh)}")
+        print(f"gt_facecolors length: {len(gt_facecolors)}")
+        print(f"pred_barh length: {len(pred_barh)}")
+        print(f"pred_facecolors length: {len(pred_facecolors)}")
+
+        plt.style.use("ggplot")
+        fig, ax = plt.subplots(figsize=(17,6))
+        ax.broken_barh(gt_barh, (11, 8), facecolors=gt_facecolors)
+        ax.broken_barh(pred_barh, (21, 8), facecolors=pred_facecolors)
+        ax.set_ylim(5, 35)
+        ax.set_xlim(0, len(keypoints_2d) + 1)
+        ax.set_xlabel(f'frames since start ( total frames {len(keypoints_2d) + 1} )')
+        ax.set_yticks([15, 25])
+        ax.set_yticklabels(['Predicted Segments', 'Ground Truth Segments'])     
+        ax.grid(True)   
+        plt.savefig(f"checkpoint/temporal_segments_{TIMESTAMP[:-1]}")                                
+        plt.show()
+        
+
+        ## Show the predicted segments in video
+
+        # predVisualize(None, None, None)
 
     else:
 
         print("Train Mode: ")
 
-        # Tensorboard logging settings
+        ## Tensorboard logging settings
+
         description = "Train!"
         TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
         writer = SummaryWriter(args.log+'_'+TIMESTAMP)
@@ -476,12 +513,14 @@ if __name__ == "__main__":
         print("CUDA Device Count: ", torch.cuda.device_count())
         print(args)
 
-        # Fetch Training Data.
+        ## Fetch Training Data.
+
         print("[INFO] Fetching Data...")
         X_All, y_All = getTrainData(SOURCE_FOLDER)[0], getTrainData(SOURCE_FOLDER)[1]
         print(X_All.shape, y_All.shape)
 
-        # Calculate the train/validation split
+        ## Calculate the train/validation split
+
         print("[INFO] Generating the train/val/test split...")
         X_train, X_test, y_train, y_test = train_test_split(X_All, y_All, test_size=1-TRAIN_TEST_SPLIT, random_state=SEED)
         train_dataset = StrokeRecognitionDataset(X_train, y_train)
@@ -500,13 +539,15 @@ if __name__ == "__main__":
 
             print("Model: LSTM")
 
-            # Train Model.
+            ## Train Model.
+
             print("[INFO] initializing the LSTM_SR model...")
             model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
                             batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
             training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
 
-            # Evaluate Model.
+            ## Evaluate Model.
+
             print("[INFO] evaluating network...")
             test_accuracy = test_lstm(model, X_test, y_test)
             print('Training accuracy is %2.3f :' %(training_accuracy) )
@@ -517,21 +558,25 @@ if __name__ == "__main__":
 
             print("Model: CNN")
 
-            # Initialize the train, validation, and test data loaders
+            ## Initialize the train, validation, and test data loaders
+
             trainDataLoader = DataLoader(train_dataset, shuffle=True, batch_size=BATCH_SIZE)
             valDataLoader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
             testDataLoader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
 
-            # Calculate steps per epoch for training and validation set
+            ## Calculate steps per epoch for training and validation set
+
             trainSteps = len(trainDataLoader.dataset) // BATCH_SIZE
             valSteps = len(valDataLoader.dataset) // BATCH_SIZE
             print(f"Train steps: {trainSteps}, Val steps: {valSteps}")
 
-            # Train Model.
+            ## Train Model.
+
             print("[INFO] initializing the CNN_SR model...")
             model = CNN_SR(num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
             model, history = train_cnn(model, trainDataLoader, valDataLoader, trainSteps, valSteps)
 
-            # Evaluate Model.
+            ## Evaluate Model.
+
             print("[INFO] evaluating network...")
-            test_cnn(model, history, testDataLoader)
+            test_cnn(model, history, testDataLoader, test_dataset)
