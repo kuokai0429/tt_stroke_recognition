@@ -12,6 +12,8 @@ from common.log import Logger
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.font_manager import fontManager
 import cv2
 import seaborn as sns
 import pandas as pd
@@ -360,43 +362,6 @@ if __name__ == "__main__":
     # Set up random seed on everything
     init_seed(SEED)
 
-    # stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
-    # facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
-    # gt_barh, pred_barh, gt_facecolors, pred_facecolors = [], [], [], []
-    # ground_truth = np.array([0, 0, 0, 1, 1, 2, 3, 3, 0, 0, 0, 0, 0, 3, 3, 0, 0])
-
-    # for target in [(ground_truth, gt_barh, gt_facecolors, 'Ground Truth barh')]:
-
-    #     print(f"\n--------------------- {target[3]} ---------------------")
-
-    #     pre_startframe, pre_class, length = 0, target[0][1], 1
-    #     for i in range(1, len(ground_truth)):
-
-    #         if target[0][i] == pre_class:
-    #             length += 1
-    #         else:
-    #             print((pre_startframe, length), facecolors_stroke_class[pre_class])
-    #             target[1].append((pre_startframe, length))
-    #             target[2].append(facecolors_stroke_class[pre_class])
-    #             pre_startframe, length = i, 1
-
-    #         pre_class = target[0][i]
-
-    #     print((pre_startframe, length), facecolors_stroke_class[pre_class])
-    #     target[1].append((pre_startframe, length))
-    #     target[2].append(facecolors_stroke_class[pre_class])
-
-    # plt.style.use("ggplot")
-    # fig, ax = plt.subplots(figsize=(17,6))
-    # ax.broken_barh(gt_barh, (21, 8), facecolors=gt_facecolors)
-    # ax.set_ylim(5, 35)
-    # ax.set_xlim(0, len(ground_truth))
-    # ax.set_xlabel(f'frames since start ( total frames {len(ground_truth)} )')
-    # ax.set_yticks([25])
-    # ax.set_yticklabels(['Ground Truth Segments'])     
-    # ax.grid(True)                                
-    # plt.show()
-
     if args.inference:
         
         print("Inference Mode: ")
@@ -492,8 +457,7 @@ if __name__ == "__main__":
         print(f"Ground Truth Segments: {ground_truth.shape, np.unique(ground_truth), count_ground_truth}")
 
 
-        ## Plot the predicted segments compared with the ground-truth segments 
-        ## (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
+        ## Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
         facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
@@ -501,7 +465,7 @@ if __name__ == "__main__":
 
         for target in [(ground_truth, gt_barh, gt_facecolors, 'Ground Truth barh'), (pred_result, pred_barh, pred_facecolors, 'Predicted barh')]:
 
-            print(f"\n--------------------- {target[3]} ---------------------")
+            # print(f"\n--------------------- {target[3]} ---------------------")
 
             pre_startframe, pre_class, length = 1, target[0][1], 1
             for i in range(2, len(keypoints_2d) + 1):
@@ -525,6 +489,8 @@ if __name__ == "__main__":
         print(f"pred_barh length: {len(pred_barh)}")
         print(f"pred_facecolors length: {len(pred_facecolors)}")
 
+        fontManager.addfont('input/TaipeiSansTCBeta-Regular.ttf')
+        plt.rc('font', family='Taipei Sans TC Beta')
         plt.style.use("ggplot")
         fig, ax = plt.subplots(figsize=(17,6))
         ax.broken_barh(pred_barh, (11, 8), facecolors=pred_facecolors)
@@ -533,8 +499,15 @@ if __name__ == "__main__":
         ax.set_xlim(0, len(keypoints_2d))
         ax.set_xlabel(f'frames since start ( total frames {len(keypoints_2d)} )')
         ax.set_yticks([15, 25])
-        ax.set_yticklabels(['Predicted Segments', 'Ground Truth Segments'])     
+        ax.set_yticklabels(['Predicted Segments', 'Ground Truth Segments'])    
         ax.grid(True)   
+        plt.legend(["其他", "右正手發球", "右反手發球", "右正手回球", "右反手回球"])
+        h = [mpatches.Patch(color='grey', label="其他"), 
+             mpatches.Patch(color='blue', label="右正手發球"),
+             mpatches.Patch(color='green', label="右反手發球"),
+             mpatches.Patch(color='red', label="右正手回球"),
+             mpatches.Patch(color='orange', label="右反手回球")]
+        plt.legend(handles=h, bbox_to_anchor =(1.10, 0.63))
         plt.savefig(f"checkpoint/temporal_segments_{TIMESTAMP[:-1]}")                                
         plt.show()
 
@@ -553,6 +526,7 @@ if __name__ == "__main__":
 
         print("Train Mode: ")
 
+
         ## Tensorboard logging settings
 
         description = "Train!"
@@ -570,11 +544,13 @@ if __name__ == "__main__":
         print("CUDA Device Count: ", torch.cuda.device_count())
         print(args)
 
+
         ## Fetch Training Data.
 
         print("[INFO] Fetching Data...")
         X_All, y_All = getTrainData(SOURCE_FOLDER)[0], getTrainData(SOURCE_FOLDER)[1]
         print(X_All.shape, y_All.shape)
+
 
         ## Calculate the train/validation split
 
@@ -596,12 +572,14 @@ if __name__ == "__main__":
 
             print("Model: LSTM")
 
+
             ## Train Model.
 
             print("[INFO] initializing the LSTM_SR model...")
             model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
                             batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
             training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
+
 
             ## Evaluate Model.
 
@@ -615,11 +593,13 @@ if __name__ == "__main__":
 
             print("Model: CNN")
 
+
             ## Initialize the train, validation, and test data loaders
 
             trainDataLoader = DataLoader(train_dataset, shuffle=True, batch_size=BATCH_SIZE)
             valDataLoader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
             testDataLoader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
+
 
             ## Calculate steps per epoch for training and validation set
 
@@ -627,11 +607,13 @@ if __name__ == "__main__":
             valSteps = len(valDataLoader.dataset) // BATCH_SIZE
             print(f"Train steps: {trainSteps}, Val steps: {valSteps}")
 
+
             ## Train Model.
 
             print("[INFO] initializing the CNN_SR model...")
             model = CNN_SR(num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
             model, history = train_cnn(model, trainDataLoader, valDataLoader, trainSteps, valSteps)
+
 
             ## Evaluate Model.
 
