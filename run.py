@@ -537,6 +537,12 @@ if __name__ == "__main__":
         ax.grid(True)   
         plt.savefig(f"checkpoint/temporal_segments_{TIMESTAMP[:-1]}")                                
         plt.show()
+
+
+        ## Calculate the IoU or DICE of Ground Truth and Predicted Segments.
+
+
+        ## Calculate the TP, FP, FN of Predicted Segments.
         
 
         ## Show the predicted segments in video
