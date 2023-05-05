@@ -360,6 +360,43 @@ if __name__ == "__main__":
     # Set up random seed on everything
     init_seed(SEED)
 
+    # stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
+    # facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
+    # gt_barh, pred_barh, gt_facecolors, pred_facecolors = [], [], [], []
+    # ground_truth = np.array([0, 0, 0, 1, 1, 2, 3, 3, 0, 0, 0, 0, 0, 3, 3, 0, 0])
+
+    # for target in [(ground_truth, gt_barh, gt_facecolors, 'Ground Truth barh')]:
+
+    #     print(f"\n--------------------- {target[3]} ---------------------")
+
+    #     pre_startframe, pre_class, length = 0, target[0][1], 1
+    #     for i in range(1, len(ground_truth)):
+
+    #         if target[0][i] == pre_class:
+    #             length += 1
+    #         else:
+    #             print((pre_startframe, length), facecolors_stroke_class[pre_class])
+    #             target[1].append((pre_startframe, length))
+    #             target[2].append(facecolors_stroke_class[pre_class])
+    #             pre_startframe, length = i, 1
+
+    #         pre_class = target[0][i]
+
+    #     print((pre_startframe, length), facecolors_stroke_class[pre_class])
+    #     target[1].append((pre_startframe, length))
+    #     target[2].append(facecolors_stroke_class[pre_class])
+
+    # plt.style.use("ggplot")
+    # fig, ax = plt.subplots(figsize=(17,6))
+    # ax.broken_barh(gt_barh, (21, 8), facecolors=gt_facecolors)
+    # ax.set_ylim(5, 35)
+    # ax.set_xlim(0, len(ground_truth))
+    # ax.set_xlabel(f'frames since start ( total frames {len(ground_truth)} )')
+    # ax.set_yticks([25])
+    # ax.set_yticklabels(['Ground Truth Segments'])     
+    # ax.grid(True)                                
+    # plt.show()
+
     if args.inference:
         
         print("Inference Mode: ")
@@ -402,6 +439,8 @@ if __name__ == "__main__":
 
         ## Predict stroke classes on each frame with different window stride (mid frame of window).
 
+        print("[INFO] Predicting stroke classes on each frame.")
+
         stride, pred_result = [1, 3, 5], [0] * (len(keypoints_2d) + 1)
         temp = int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2]
 
@@ -433,7 +472,7 @@ if __name__ == "__main__":
         pred_result = np.array(pred_result)
         count_pred_result = [np.count_nonzero(pred_result == 0), np.count_nonzero(pred_result == 1), 
                np.count_nonzero(pred_result == 2), np.count_nonzero(pred_result == 3), np.count_nonzero(pred_result == 4)]
-        print(f"\nPredicted Segments: {np.unique(pred_result), count_pred_result}")
+        print(f"\nPredicted Segments: {pred_result.shape, np.unique(pred_result), count_pred_result}")
     
 
         ## Prepare Ground Truth Segments
@@ -450,7 +489,7 @@ if __name__ == "__main__":
         ground_truth = np.array(ground_truth)
         count_ground_truth = [np.count_nonzero(ground_truth == 0), np.count_nonzero(ground_truth == 1), 
                np.count_nonzero(ground_truth == 2), np.count_nonzero(ground_truth == 3), np.count_nonzero(ground_truth == 4)]
-        print(f"Ground Truth Segments: {np.unique(ground_truth), count_ground_truth}")
+        print(f"Ground Truth Segments: {ground_truth.shape, np.unique(ground_truth), count_ground_truth}")
 
 
         ## Plot the predicted segments compared with the ground-truth segments 
@@ -462,21 +501,24 @@ if __name__ == "__main__":
 
         for target in [(ground_truth, gt_barh, gt_facecolors, 'Ground Truth barh'), (pred_result, pred_barh, pred_facecolors, 'Predicted barh')]:
 
-            # print(f"\n--------------------- {target[3]} ---------------------")
+            print(f"\n--------------------- {target[3]} ---------------------")
 
             pre_startframe, pre_class, length = 1, target[0][1], 1
-            for i in range(1, len(keypoints_2d) + 1):
+            for i in range(2, len(keypoints_2d) + 1):
 
                 if target[0][i] == pre_class:
                     length += 1
                 else:
+                    # print((pre_startframe, length), facecolors_stroke_class[pre_class])
                     target[1].append((pre_startframe, length))
                     target[2].append(facecolors_stroke_class[pre_class])
                     pre_startframe, length = i, 1
 
-                    # print((pre_startframe, length), facecolors_stroke_class[pre_class])
-
                 pre_class = target[0][i]
+
+            # print((pre_startframe, length), facecolors_stroke_class[pre_class])
+            target[1].append((pre_startframe, length))
+            target[2].append(facecolors_stroke_class[pre_class])
 
         print(f"\ngt_barh length: {len(gt_barh)}")
         print(f"gt_facecolors length: {len(gt_facecolors)}")
