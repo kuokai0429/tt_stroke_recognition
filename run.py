@@ -308,9 +308,9 @@ def test_cnn(model, history, testDataLoader, test_dataset):
     
     # Confusion Matrix
     cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
-    svm = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+    svm = sns.heatmap(cf_matrix, annot=True, cmap='Blues', fmt='g')
     figure = svm.get_figure()    
-    figure.savefig(f'checkpoint/confusion_matrix_TEST_{TIMESTAMP[:-1]}.png', dpi=400)
+    figure.savefig(f'checkpoint/confusion_matrix_TRAIN_{TIMESTAMP[:-1]}.png', dpi=400)
     print(cf_matrix)
     
     # Plot the training loss and accuracy
@@ -376,7 +376,7 @@ if __name__ == "__main__":
     init_seed(SEED)
 
     if args.inference:
-        
+
         print("Inference Mode: ")
 
         TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
@@ -501,7 +501,7 @@ if __name__ == "__main__":
         print(f"\ngt_barh length: {len(gt_barh)}")
         print(f"gt_facecolors length: {len(gt_facecolors)}")
         print(f"pred_barh length: {len(pred_barh)}")
-        print(f"pred_facecolors length: {len(pred_facecolors)}")
+        print(f"pred_facecolors length: {len(pred_facecolors)}", end="\n")
 
         fontManager.addfont('input/TaipeiSansTCBeta-Regular.ttf')
         plt.rc('font', family='Taipei Sans TC Beta')
@@ -524,6 +524,7 @@ if __name__ == "__main__":
         plt.legend(handles=h, bbox_to_anchor =(1.10, 0.63))
         plt.savefig(f"output/temporal_segments_{TIMESTAMP[:-1]}")                                
         # plt.show()
+        plt.clf()
 
 
         ## Show the predicted segments in video
@@ -532,18 +533,43 @@ if __name__ == "__main__":
         predVisualize(TIMESTAMP[:-1], f"input/cropped_{'_'.join(filename)}.mp4", pred_result, keypoints_2d)
 
 
-        ## Calculate the IoU or DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
+        ## Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
 
+        # Confusion Matrix
         cm = confusion_matrix(ground_truth, pred_result)
-        svm = sns.heatmap(cm, annot=True, cmap='Blues')
-        figure = svm.get_figure()    
+        svm = sns.heatmap(cm, annot=True, cmap='Blues', fmt='g')
+        figure = svm.get_figure()   
+        figure.set_figwidth(12)
+        figure.set_figheight(10)
+        plt.style.use("ggplot")
+        fontManager.addfont('input/TaipeiSansTCBeta-Regular.ttf')
+        plt.rc('font', family='Taipei Sans TC Beta')
+        plt.legend(["其他", "右正手發球", "右反手發球", "右正手回球", "右反手回球"])
+        h = [mpatches.Patch(color='grey', label="0: 其他"), 
+             mpatches.Patch(color='blue', label="1: 右正手發球"),
+             mpatches.Patch(color='green', label="2: 右反手發球"),
+             mpatches.Patch(color='red', label="3: 右正手回球"),
+             mpatches.Patch(color='orange', label="4: 右反手回球")]
+        plt.legend(handles=h, bbox_to_anchor =(1.4, 1))
+        # plt.show() 
         figure.savefig(f'output/confusion_matrix_INFERENCE_{TIMESTAMP[:-1]}.png', dpi=400)
-        print(cm)
+        
 
-        print(classification_report(ground_truth, pred_result, target_names=StrokeRecognitionDataset().classes))
+        # The IoU for class c, IoUc = cm(c, c) / sum(col(c)) + sum(row(c)) - cm(c, c)
+        IoUc = [(cm[c][c] / (cm.sum(axis=0)[c] + cm.sum(axis=1)[c] - cm[c][c])) for c in range(len(StrokeRecognitionDataset().classes))]
+
+        # The mean IoU 
+        mIoU = sum(IoUc) / len(StrokeRecognitionDataset().classes)
+
+        print(f"Confusion Matrix:\n{cm}")
+        print(f"Classification Report: {classification_report(ground_truth, pred_result, target_names=StrokeRecognitionDataset().classes)}")
+        print(f"IoU for class c (IoUc): {IoUc}")
+        print(f"The mean IoU (mIoU): {mIoU}")
 
 
-        ## Calculate the TP, FP, FN of Predicted Segments.
+        ## Calculate the TP, FP, FN of Predicted Segments in a stroke wise way.
+
+        
 
 
     else:
