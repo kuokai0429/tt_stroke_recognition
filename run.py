@@ -47,6 +47,7 @@ SEED = 0
 SOURCE_FOLDER = "input\\"
 INFERENCE_TARGET = "f1_right"
 CHECKPOINT = "epoch50_20230503T15-05-00.pth"
+NUMBER_OF_CLASSES = len(StrokeRecognitionDataset().classes)
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='main')
@@ -410,7 +411,7 @@ if __name__ == "__main__":
             ## Load model weights
 
             print("[INFO] initializing the CNN_SR model...")
-            model = CNN_SR(num_classes=len(StrokeRecognitionDataset().classes)).to(DEVICE)
+            model = CNN_SR(num_classes=NUMBER_OF_CLASSES).to(DEVICE)
             model.load_state_dict(torch.load(args.checkpoint))
             model.eval()
 
@@ -468,6 +469,10 @@ if __name__ == "__main__":
         count_ground_truth = [np.count_nonzero(ground_truth == 0), np.count_nonzero(ground_truth == 1), 
                np.count_nonzero(ground_truth == 2), np.count_nonzero(ground_truth == 3), np.count_nonzero(ground_truth == 4)]
         print(f"Ground Truth Segments: {ground_truth.shape, np.unique(ground_truth), count_ground_truth}")
+
+
+        # ground_truth = np.array([0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 3, 3, 3, 3, 1, 1, 0, 0, 2, 2, 2, 0, 0, 0, 0])
+        # pred_result = np.array([0, 0, 0, 1, 1, 0, 0, 0, 3, 3, 3, 4, 4, 3, 3, 1, 1, 0, 2, 1, 2, 0, 0, 0, 0])
 
 
         ## Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
@@ -535,6 +540,8 @@ if __name__ == "__main__":
 
         ## Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
 
+        print("[INFO] Calculating the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments....")
+
         # Confusion Matrix
         cm = confusion_matrix(ground_truth, pred_result)
         svm = sns.heatmap(cm, annot=True, cmap='Blues', fmt='g')
@@ -556,10 +563,10 @@ if __name__ == "__main__":
         
 
         # The IoU for class c, IoUc = cm(c, c) / sum(col(c)) + sum(row(c)) - cm(c, c)
-        IoUc = [(cm[c][c] / (cm.sum(axis=0)[c] + cm.sum(axis=1)[c] - cm[c][c])) for c in range(len(StrokeRecognitionDataset().classes))]
+        IoUc = [(cm[c][c] / (cm.sum(axis=0)[c] + cm.sum(axis=1)[c] - cm[c][c])) for c in range(NUMBER_OF_CLASSES)]
 
         # The mean IoU 
-        mIoU = sum(IoUc) / len(StrokeRecognitionDataset().classes)
+        mIoU = sum(IoUc) / NUMBER_OF_CLASSES
 
         print(f"Confusion Matrix:\n{cm}")
         print(f"Classification Report: {classification_report(ground_truth, pred_result, target_names=StrokeRecognitionDataset().classes)}")
@@ -567,10 +574,111 @@ if __name__ == "__main__":
         print(f"The mean IoU (mIoU): {mIoU}")
 
 
-        ## Calculate the TP, FP, FN of Predicted Segments in a stroke wise way.
+        ## Calculate the TP, FP, FN of Predicted Segments in a stroke-wise way.
 
-        
+        print("[INFO] Calculating the TP, FP, FN of Predicted Segments in a stroke-wise way....")
 
+        gt_class_mask = {0: [], 1: [], 2: [], 3: [], 4: []}
+        pred_class_mask = {0: [], 1: [], 2: [], 3: [], 4: []}
+
+        gt_class_segments = {0: [], 1: [], 2: [], 3: [], 4: []}
+        pred_class_segments = {0: [], 1: [], 2: [], 3: [], 4: []}
+
+        # Split multi-class segments into single-class segments.
+        for c in range(NUMBER_OF_CLASSES):
+            gt_class_mask[c] = np.array([1 if ground_truth[i] == c else 0 for i in range(len(ground_truth))])
+            pred_class_mask[c] = np.array([1 if pred_result[i] == c else 0 for i in range(len(pred_result))])
+
+        # Find the range of each single-class segments.
+        for c in range(NUMBER_OF_CLASSES):
+
+            # print(f"\nClass: {c}")
+            # print(gt_class_mask[c][:])
+            # print(pred_class_mask[c][:])
+
+            for target in [(gt_class_mask[c], gt_class_segments[c], "Ground Truth Mask"), (pred_class_mask[c], pred_class_segments[c], "Predicted Mask")]:
+
+                # print(target[2])
+
+                pre_startframe, pre_state, length = 0, target[0][0], 1
+                for i in range(1, len(target[0])):
+
+                    if target[0][i] == pre_state:
+                        length += 1
+                    else:
+                        # print(pre_state, (pre_startframe, pre_startframe + length - 1))
+                        if pre_state == 1:
+                            target[1].append((pre_startframe, pre_startframe + length - 1))
+                        pre_startframe, length = i, 1
+
+                    pre_state = target[0][i]
+
+                # print(pre_state, (pre_startframe, pre_startframe + length - 1))
+                if pre_state == 1:
+                    target[1].append((pre_startframe, pre_startframe + length - 1))
+
+        # Count the strike-wise TP, FN of each class
+
+        # print("\nStrike-wise TP, FN of each class: ")
+
+        tp_c, fn_c = [0] * NUMBER_OF_CLASSES, [0] * NUMBER_OF_CLASSES
+        for c in range(NUMBER_OF_CLASSES):
+
+            # print(f"\nClass: {c}")
+            tp_c_temp, fn_c_temp = 0, 0
+
+            for gt_s in gt_class_segments[c]: 
+                
+                count = 0
+                for pre_s in pred_class_segments[c]:
+
+                    if not set(gt_s).isdisjoint(pre_s):
+                        # print(gt_s, pre_s)
+                        tp_c_temp += 1
+                        count += 1
+                        break
+
+                if count == 0: 
+                    fn_c_temp += 1
+
+            tp_c[c] = tp_c_temp
+            fn_c[c] = fn_c_temp
+
+
+        # Count the strike-wise FP of each class
+
+        # print("\nStrike-wise FP of each class: ")
+
+        fp_c = [0] * NUMBER_OF_CLASSES
+        for c in range(NUMBER_OF_CLASSES):
+
+            # print(f"\nClass: {c}")
+            fp_c_temp = 0
+
+            for pre_s in pred_class_segments[c]:
+                
+                count = 0
+                for gt_s in gt_class_segments[c]: 
+
+                    if not set(pre_s).isdisjoint(gt_s):
+                        count += 1
+                        break
+
+                if count == 0:
+                    # print(pre_s) 
+                    fp_c_temp += 1
+
+            fp_c[c] = fp_c_temp
+
+        print(f"\nTP_C: {tp_c}, FN_C: {fn_c}, FP_C: {fp_c}")
+
+        precision_c = [(tp_c[c] / (tp_c[c] + fp_c[c])) if tp_c[c] != 0 else 0 for c in range(NUMBER_OF_CLASSES)]
+        recall_c = [(tp_c[c] / (tp_c[c] + fn_c[c])) if tp_c[c] != 0 else 0 for c in range(NUMBER_OF_CLASSES)]
+        f1score_c = [((2 * precision_c[c] * recall_c[c]) / (precision_c[c] + recall_c[c])) if precision_c[c] != 0 and recall_c[c] != 0 else 0 for c in range(NUMBER_OF_CLASSES)]
+
+        print(f"Precision_C: {precision_c}")
+        print(f"Recall_C: {recall_c}")
+        print(f"F1-Score_C: {f1score_c}")
 
     else:
 
