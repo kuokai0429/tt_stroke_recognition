@@ -35,16 +35,6 @@ from common.model import CNN_SR
 from common.dataset import StrokeRecognitionDataset
 
 
-# Argument Parser
-parser = argparse.ArgumentParser(description='main')
-parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
-parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
-parser.add_argument('--inference', action='store_true', help='Inference Mode.')
-parser.add_argument('--checkpoint', default='checkpoint/epoch50_20230503T15-05-00.pth', help='Stroke Recognition Model Weight.')
-parser.add_argument('--keypoints', default='input/cropped_f1_right.npz', help='Human Pose Estimation Keypoints.')
-parser.add_argument('--gt', default='annotation/f1_right.csv', help='Stroke Segments Ground Truth.')
-args = parser.parse_args()
-
 # Define training hyperparameters
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 INIT_LR = 1e-3
@@ -55,6 +45,18 @@ TRAIN_TEST_SPLIT = 0.9
 TRAIN_VAL_SPLIT = 0.8
 SEED = 0
 SOURCE_FOLDER = "input\\"
+INFERENCE_TARGET = "f1_right"
+CHECKPOINT = "epoch50_20230503T15-05-00.pth"
+
+# Argument Parser
+parser = argparse.ArgumentParser(description='main')
+parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
+parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
+parser.add_argument('--inference', action='store_true', help='Inference Mode.')
+parser.add_argument('--checkpoint', default=f'checkpoint/{CHECKPOINT}', help='Stroke Recognition Model Weight.')
+parser.add_argument('--keypoints', default=f'input/cropped_{INFERENCE_TARGET}.npz', help='Human Pose Estimation Keypoints.')
+parser.add_argument('--gt', default=f'annotation/{INFERENCE_TARGET}.csv', help='Stroke Segments Ground Truth.')
+args = parser.parse_args()
 
 
 def init_seed(seed):
@@ -308,7 +310,7 @@ def test_cnn(model, history, testDataLoader, test_dataset):
     cf_matrix = confusion_matrix(test_dataset.targets.cpu().numpy(), np.array(preds))
     svm = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
     figure = svm.get_figure()    
-    figure.savefig(f'checkpoint/confusion_matrix_{TIMESTAMP[:-1]}.png', dpi=400)
+    figure.savefig(f'checkpoint/confusion_matrix_TEST_{TIMESTAMP[:-1]}.png', dpi=400)
     print(cf_matrix)
     
     # Plot the training loss and accuracy
@@ -328,33 +330,44 @@ def test_cnn(model, history, testDataLoader, test_dataset):
     torch.save(model.state_dict(), f"checkpoint/epoch{EPOCHS}_{TIMESTAMP[:-1]}.pth")
 
 
-def predVisualize(i, filepath, pred_mask):
+def predVisualize(TIMESTAMP, filepath, pred_mask, keypoints_2d):
+
+    print("[INFO] Saving predicted segments to video....")
 
     cap = cv2.VideoCapture(filepath)
-    output = cv2.VideoWriter('PredictionResult_' + str(i) + '.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
+    output = cv2.VideoWriter(f'output/predictions_{TIMESTAMP}.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
                 float(30), (int(cap.get(3)), int(cap.get(4))))
-    classes = ['Forehand Drive', 'Backhand Drive', 'Backhand Push', 'None']
-    color = [(255, 0, 0), (0, 100, 0), (0, 0, 255), (0, 0, 0)]
+    
+    classes = ['None', 'Forehand Serve', 'Backhand Serve', 'Forehand Push', 'Backhand Push']
+    color = [(0, 0, 0), (0, 0, 255), (0, 100, 0), (255, 0, 0), (245, 144, 66)]
+    count, progression_bar = 0, tqdm(total = len(pred_mask))
 
-    count = 0
     while(cap.isOpened()):
         
         count += 1
         ret, frame = cap.read()
         
         if ret == True:
-            cv2.rectangle(frame, (40, 10), (1000, 60), (255, 255, 255), -1, cv2.LINE_AA)
+
+            cv2.rectangle(frame, (40, 10), (800, 60), (255, 255, 255), -1, cv2.LINE_AA)
             # cv2.putText(frame, "Frame: " + str(count) + " Predictions: " + str(classes[pred[i-1][0][0]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
             #       1.5, (0, 0, 0), 5, cv2.LINE_4)
-            cv2.putText(frame, "Predictions: " + str(classes[pred_mask[count-1]]), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
-                1.5, color[pred_mask[count-1]], 5, cv2.LINE_4)
+            cv2.putText(frame, f"Frame: {count}  Stroke Class: {str(classes[pred_mask[count-1]])}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                1, color[pred_mask[count-1]], 5, cv2.LINE_4)
+            
+            if keypoints_2d[count-1] is not None:
+            
+                for x, y in keypoints_2d[count-1]:
+                    frame = cv2.circle(frame, (int(x), int(y)), radius=3, color=(0, 255, 0), thickness=-1)
             
             output.write(frame)
+            progression_bar.update(1)
         else:
             break 
 
     cap.release()
     output.release()
+    progression_bar.close()
 
 
 if __name__ == "__main__":
@@ -402,9 +415,9 @@ if __name__ == "__main__":
             model.eval()
 
 
-        ## Predict stroke classes on each frame with different window stride (mid frame of window).
+        ## Classifying stroke classes on each frame with different window stride (mid frame of window).
 
-        print("[INFO] Predicting stroke classes on each frame.")
+        print("[INFO] Classifying stroke classes on each frame....")
 
         stride, pred_result = [1, 3, 5], [0] * (len(keypoints_2d) + 1)
         temp = int((MODEL_INPUT_FRAMES - 1) / 2) * stride[2]
@@ -484,6 +497,7 @@ if __name__ == "__main__":
             target[1].append((pre_startframe, length))
             target[2].append(facecolors_stroke_class[pre_class])
 
+        print("[INFO] Drawing Ground Truth and Predicted Results Segments.")
         print(f"\ngt_barh length: {len(gt_barh)}")
         print(f"gt_facecolors length: {len(gt_facecolors)}")
         print(f"pred_barh length: {len(pred_barh)}")
@@ -508,19 +522,29 @@ if __name__ == "__main__":
              mpatches.Patch(color='red', label="右正手回球"),
              mpatches.Patch(color='orange', label="右反手回球")]
         plt.legend(handles=h, bbox_to_anchor =(1.10, 0.63))
-        plt.savefig(f"checkpoint/temporal_segments_{TIMESTAMP[:-1]}")                                
-        plt.show()
+        plt.savefig(f"output/temporal_segments_{TIMESTAMP[:-1]}")                                
+        # plt.show()
 
-
-        ## Calculate the IoU or DICE of Ground Truth and Predicted Segments.
-
-
-        ## Calculate the TP, FP, FN of Predicted Segments.
-        
 
         ## Show the predicted segments in video
 
-        # predVisualize(None, None, None)
+        filename = args.keypoints.rsplit('/')[1].rsplit(".")[0].rsplit("_")[1:]
+        predVisualize(TIMESTAMP[:-1], f"input/cropped_{'_'.join(filename)}.mp4", pred_result, keypoints_2d)
+
+
+        ## Calculate the IoU or DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
+
+        cm = confusion_matrix(ground_truth, pred_result)
+        svm = sns.heatmap(cm, annot=True, cmap='Blues')
+        figure = svm.get_figure()    
+        figure.savefig(f'output/confusion_matrix_INFERENCE_{TIMESTAMP[:-1]}.png', dpi=400)
+        print(cm)
+
+        print(classification_report(ground_truth, pred_result, target_names=StrokeRecognitionDataset().classes))
+
+
+        ## Calculate the TP, FP, FN of Predicted Segments.
+
 
     else:
 

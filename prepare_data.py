@@ -18,13 +18,13 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
 
+# Define training data hyperparameters
+MODEL_INPUT_FRAMES = 15
+
 # Argument Parser
 parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--mode', default="video", required=True, type=str, help="Mode.")
 args = parser.parse_args()
-
-# Define training data hyperparameters
-MODEL_INPUT_FRAMES = 15
 
 
 def getVideoInfo(filepath):
@@ -176,8 +176,8 @@ def prepareData_txt(filename, model_input_frames):
 
                     if count == model_input_frames: break
 
-                    keypoints_frame.append([keypoints_2d[i], i])
-                    train.append(keypoints_2d[i])
+                    keypoints_frame.append([keypoints_2d[i-1], i])
+                    train.append(keypoints_2d[i-1])
                     
                 train_label.append([stroke_class[sc]])
 
@@ -247,7 +247,7 @@ def prepareData_csv(model_input_frames):
 
                             if count == model_input_frames: break
 
-                            keypoints_frame.append([keypoints_2d[i-1], i-1])
+                            keypoints_frame.append([keypoints_2d[i-1], i])
                             train.append(keypoints_2d[i-1])
                             
                         train_label.append([stroke_class[sc]])
