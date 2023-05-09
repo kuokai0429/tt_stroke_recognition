@@ -340,7 +340,7 @@ def predVisualize(TIMESTAMP, filepath, pred_mask, keypoints_2d):
                 float(30), (int(cap.get(3)), int(cap.get(4))))
     
     classes = ['None', 'Forehand Serve', 'Backhand Serve', 'Forehand Push', 'Backhand Push']
-    color = [(0, 0, 0), (0, 0, 255), (0, 100, 0), (255, 0, 0), (245, 144, 66)]
+    color = [(0, 0, 0), (255, 0, 0), (0, 100, 0), (0, 0, 255), (66, 144, 245)]
     count, progression_bar = 0, tqdm(total = len(pred_mask))
 
     while(cap.isOpened()):
@@ -471,10 +471,6 @@ if __name__ == "__main__":
         print(f"Ground Truth Segments: {ground_truth.shape, np.unique(ground_truth), count_ground_truth}")
 
 
-        # ground_truth = np.array([0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 3, 3, 3, 3, 1, 1, 0, 0, 2, 2, 2, 0, 0, 0, 0])
-        # pred_result = np.array([0, 0, 0, 1, 1, 0, 0, 0, 3, 3, 3, 4, 4, 3, 3, 1, 1, 0, 2, 1, 2, 0, 0, 0, 0])
-
-
         ## Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
@@ -486,7 +482,7 @@ if __name__ == "__main__":
             # print(f"\n--------------------- {target[3]} ---------------------")
 
             pre_startframe, pre_class, length = 1, target[0][1], 1
-            for i in range(2, len(keypoints_2d) + 1):
+            for i in range(2, len(keypoints_2d) + 1)[:]:
 
                 if target[0][i] == pre_class:
                     length += 1
@@ -502,8 +498,8 @@ if __name__ == "__main__":
             target[1].append((pre_startframe, length))
             target[2].append(facecolors_stroke_class[pre_class])
 
-        print("[INFO] Drawing Ground Truth and Predicted Results Segments.")
-        print(f"\ngt_barh length: {len(gt_barh)}")
+        print("\n[INFO] Drawing Ground Truth and Predicted Results Segments.")
+        print(f"gt_barh length: {len(gt_barh)}")
         print(f"gt_facecolors length: {len(gt_facecolors)}")
         print(f"pred_barh length: {len(pred_barh)}")
         print(f"pred_facecolors length: {len(pred_facecolors)}", end="\n")
@@ -539,8 +535,12 @@ if __name__ == "__main__":
 
 
         ## Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
+        
+        print("\n[INFO] Calculating the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments....")
 
-        print("[INFO] Calculating the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments....")
+        # Insure that each class has one prediction for confusion_matrix() and classification_report().
+        ground_truth = np.append(ground_truth, [0, 1, 2, 3, 4])
+        pred_result = np.append(pred_result, [0, 1, 2, 3, 4])
 
         # Confusion Matrix
         cm = confusion_matrix(ground_truth, pred_result)
@@ -573,10 +573,20 @@ if __name__ == "__main__":
         print(f"IoU for class c (IoUc): {IoUc}")
         print(f"The mean IoU (mIoU): {mIoU}")
 
+        # Remove the patches of [0, 1, 2, 3, 4].
+        ground_truth = ground_truth[:-5]
+        pred_result = pred_result[:-5]
+
 
         ## Calculate the TP, FP, FN of Predicted Segments in a stroke-wise way.
 
-        print("[INFO] Calculating the TP, FP, FN of Predicted Segments in a stroke-wise way....")
+        # ground_truth = np.array([0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 3, 3, 3, 3, 1, 1, 0, 0, 2, 2, 2, 0, 0, 0, 0])
+        # pred_result =  np.array([0, 0, 0, 1, 1, 0, 0, 0, 3, 3, 3, 4, 4, 3, 3, 1, 1, 0, 2, 1, 2, 0, 0, 0, 0])
+
+        # ground_truth = ground_truth[:2000]
+        # pred_result = pred_result[:2000]
+
+        print("\n[INFO] Calculating the TP, FP, FN of Predicted Segments in a stroke-wise way....")
 
         gt_class_mask = {0: [], 1: [], 2: [], 3: [], 4: []}
         pred_class_mask = {0: [], 1: [], 2: [], 3: [], 4: []}
@@ -590,11 +600,11 @@ if __name__ == "__main__":
             pred_class_mask[c] = np.array([1 if pred_result[i] == c else 0 for i in range(len(pred_result))])
 
         # Find the range of each single-class segments.
-        for c in range(NUMBER_OF_CLASSES):
+        for c in range(NUMBER_OF_CLASSES)[:]:
 
             # print(f"\nClass: {c}")
-            # print(gt_class_mask[c][:])
-            # print(pred_class_mask[c][:])
+            # print(gt_class_mask[c][:], np.unique(gt_class_mask[c][:]))
+            # print(pred_class_mask[c][:], np.unique(gt_class_mask[c][:]))
 
             for target in [(gt_class_mask[c], gt_class_segments[c], "Ground Truth Mask"), (pred_class_mask[c], pred_class_segments[c], "Predicted Mask")]:
 
@@ -617,12 +627,18 @@ if __name__ == "__main__":
                 if pre_state == 1:
                     target[1].append((pre_startframe, pre_startframe + length - 1))
 
+        for c in range(NUMBER_OF_CLASSES)[:]:
+            print(f"\nClass: {c}")
+            print(f"gt_class_segments[{c}] length({len(gt_class_segments[c])}): {gt_class_segments[c]}")
+            print(f"pred_class_segments[{c}] length({len(pred_class_segments[c])}): {pred_class_segments[c]}")
+
+        
         # Count the strike-wise TP, FN of each class
 
         # print("\nStrike-wise TP, FN of each class: ")
-
         tp_c, fn_c = [0] * NUMBER_OF_CLASSES, [0] * NUMBER_OF_CLASSES
-        for c in range(NUMBER_OF_CLASSES):
+
+        for c in range(NUMBER_OF_CLASSES)[:]:
 
             # print(f"\nClass: {c}")
             tp_c_temp, fn_c_temp = 0, 0
@@ -632,13 +648,14 @@ if __name__ == "__main__":
                 count = 0
                 for pre_s in pred_class_segments[c]:
 
-                    if not set(gt_s).isdisjoint(pre_s):
-                        # print(gt_s, pre_s)
+                    if not set(range(gt_s[0], gt_s[1]+1)).isdisjoint(set(range(pre_s[0], pre_s[1]+1))):
+                        # print("tp: ", gt_s, pre_s)
                         tp_c_temp += 1
                         count += 1
                         break
 
-                if count == 0: 
+                if count == 0:
+                    # print("fn: ", gt_s) 
                     fn_c_temp += 1
 
             tp_c[c] = tp_c_temp
@@ -648,9 +665,9 @@ if __name__ == "__main__":
         # Count the strike-wise FP of each class
 
         # print("\nStrike-wise FP of each class: ")
-
         fp_c = [0] * NUMBER_OF_CLASSES
-        for c in range(NUMBER_OF_CLASSES):
+
+        for c in range(NUMBER_OF_CLASSES)[:]:
 
             # print(f"\nClass: {c}")
             fp_c_temp = 0
@@ -660,12 +677,12 @@ if __name__ == "__main__":
                 count = 0
                 for gt_s in gt_class_segments[c]: 
 
-                    if not set(pre_s).isdisjoint(gt_s):
+                    if not set(range(pre_s[0], pre_s[1]+1)).isdisjoint(set(range(gt_s[0], gt_s[1]+1))):
                         count += 1
                         break
 
                 if count == 0:
-                    # print(pre_s) 
+                    # print("fp: ", pre_s) 
                     fp_c_temp += 1
 
             fp_c[c] = fp_c_temp

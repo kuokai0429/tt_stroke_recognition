@@ -1,10 +1,13 @@
 
 # Prepare Data
-python prepare_data.py --mode video-
-( python preapare_data.py --mode annotation )
+python preapare_data.py --mode annotation
+( python preapare_data.py --mode annotation-visualize )
+( python prepare_data.py --mode video-convert )
+( python prepare_data.py --mode video-addframe )
+( python prepare_data.py --mode video-crop )
 
 # Train
 python run.py
 
 # Inference
-python run.py
+python run.py --inference
