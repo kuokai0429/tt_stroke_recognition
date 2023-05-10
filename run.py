@@ -748,20 +748,20 @@ if __name__ == "__main__":
             print("Model: LSTM")
 
 
-            ## Train Model.
+            # ## Train Model.
 
-            print("[INFO] initializing the LSTM_SR model...")
-            model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
-                            batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
-            training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
+            # print("[INFO] initializing the LSTM_SR model...")
+            # model = LSTM_SR(input_dim=17*2*MODEL_INPUT_FRAMES, hidden_dim=32, num_layers=2, 
+            #                 batch_size=BATCH_SIZE, num_classes=len(train_dataset.dataset.classes)).to(DEVICE)
+            # training_accuracy = train_lstm(model, X_train, y_train, EPOCHS, INIT_LR)
 
 
-            ## Evaluate Model.
+            # ## Evaluate Model.
 
-            print("[INFO] evaluating network...")
-            test_accuracy = test_lstm(model, X_test, y_test)
-            print('Training accuracy is %2.3f :' %(training_accuracy) )
-            print('Test accuracy is %2.3f :' %(test_accuracy) )
+            # print("[INFO] evaluating network...")
+            # test_accuracy = test_lstm(model, X_test, y_test)
+            # print('Training accuracy is %2.3f :' %(training_accuracy) )
+            # print('Test accuracy is %2.3f :' %(test_accuracy) )
 
 
         elif args.model.startswith("cnn"):
