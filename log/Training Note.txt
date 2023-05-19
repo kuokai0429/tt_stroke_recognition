@@ -1,1 +1,1 @@
-/home/brian/下載/MixSTE_revised/log/run_20230322T21-14-46 : MixSTE from Paper. (243 frame)
+C:\Users\user\Desktop\stroke_recognition\log\run_20230503T15-05-00 : CNN_SR. (BATCH_SIZE=16).
