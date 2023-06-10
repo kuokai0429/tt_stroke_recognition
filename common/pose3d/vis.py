@@ -14,8 +14,8 @@ import copy
 from IPython import embed
 
 sys.path.append(os.getcwd())
-from model.mhformer import Model_Paper, Model_Proposed_1, Model_Proposed_2, Model_Proposed_3
-from common.camera import *
+from model.mhformer import Model_Paper
+from lib.camera import *
 
 import matplotlib
 import matplotlib.pyplot as plt 

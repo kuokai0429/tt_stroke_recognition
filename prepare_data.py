@@ -65,9 +65,9 @@ def videoFrame(file, folder):
     print("Finished!\n")
 
 
-def videoCrop(filepath, filename, output_directory):
+def videoCrop(filename, folder):
 
-    cap = cv2.VideoCapture(filepath)
+    cap = cv2.VideoCapture(f"{folder}{filename}.mp4")
     fps = cap.get(cv2.CAP_PROP_FPS)
     first_access, count = True, 0
 
@@ -84,7 +84,7 @@ def videoCrop(filepath, filename, output_directory):
             
             first_access = False
             area = cv2.selectROI('videoCrop', frame, showCrosshair=False, fromCenter=False)
-            out = cv2.VideoWriter(f'{output_directory}/cropped_{filename}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
+            out = cv2.VideoWriter(f'{folder}/cropped_{filename}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
                 fps, (area[2], area[3]))
 
             print("\nPress 'q' to exit!")
@@ -292,37 +292,34 @@ if __name__ == "__main__":
     if args.mode.startswith("video"):
 
         # 2d Pose estimation inference and preprocess.
-        if args.mode == "video-inference2d":
+        if args.mode == "video-pose2d":
             os.system("python common/pose2d/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4")
             os.system("python common/pose2d/prepare_data_2d_custom.py -i input -o input -os myvideos")
 
         # 3d Pose estimation inference.
-        elif args.mode == "video-inference3d":
-            print("Follow the instructions in VideoPose3D or Poseformer or MixSTE_revised.")
+        elif args.mode == "video-pose3d":
+            os.system("python common/pose3d/vis.py --video sample_video.mp4")
 
         # Video process related.
         else:
 
-            for filepath in sorted(glob.glob(f"{folder}*.MOV"))[:]:
-        
-                current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
+            filepath = "f-1.MOV"
+            current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
+            
+            # Convert video to mp4
+            if args.mode == "video-convert":
                 firstletter = filename[0]
                 fileID = re.findall(r'\d+', filename)[0]
+                os.system(f"ffmpeg -i {folder}{filepath}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
+            
+            # Add frame
+            elif args.mode == "video-addframe":
+                videoFrame(f"{filename}", folder)
 
-                # print(f"\nInput video: {filepath} -> {filename} -> {firstletter.lower()} -> {fileID} \n")
-                
-                # Convert video to mp4
-                if args.mode == "video-convert":
-                    os.system(f"ffmpeg -i {folder}{firstletter}-{fileID}.MOV -vcodec h264 -acodec mp2 {folder}{firstletter.lower()}{fileID}.mp4")
-                
-                # Add frame
-                elif args.mode == "video-addframe":
-                    videoFrame(f"{firstletter.lower()}{fileID}", folder)
-
-                # Crop video
-                elif args.mode == "video-crop":
-                    videoCrop(f"{folder}{firstletter.lower()}{fileID}.mp4", f"{firstletter.lower()}{fileID}", folder)
+            # Crop video
+            elif args.mode == "video-crop":
+                videoCrop(f"{filename}", folder)
 
 
     elif args.mode.startswith("annotation"):
