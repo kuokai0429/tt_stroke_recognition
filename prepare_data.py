@@ -293,8 +293,8 @@ if __name__ == "__main__":
 
         # 2d Pose estimation inference and preprocess.
         if args.mode == "video-inference2d":
-            os.system("python common/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4")
-            os.system("python common/prepare_data_2d_custom.py -i input -o input -os myvideos")
+            os.system("python common/pose2d/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4")
+            os.system("python common/pose2d/prepare_data_2d_custom.py -i input -o input -os myvideos")
 
         # 3d Pose estimation inference.
         elif args.mode == "video-inference3d":
