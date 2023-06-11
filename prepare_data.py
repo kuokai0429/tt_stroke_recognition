@@ -193,7 +193,7 @@ def prepareData_txt(filename, model_input_frames):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def prepareData_csv(model_input_frames):
+def prepareData_csv_ver1(model_input_frames):
 
     '''
     <All>:
@@ -326,7 +326,7 @@ if __name__ == "__main__":
 
         # Prepare Training Data
         # X_All, y_All, kf, tf = prepareData_txt("m1_right", MODEL_INPUT_FRAMES)
-        X_All, y_All, kfa, fla = prepareData_csv(MODEL_INPUT_FRAMES)
+        X_All, y_All, kfa, fla = prepareData_csv_ver1(MODEL_INPUT_FRAMES)
         print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
         print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
