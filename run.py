@@ -35,31 +35,6 @@ from common.model import CNN_SR
 from common.dataset import StrokeRecognitionDataset
 
 
-# Define training hyperparameters
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-INIT_LR = 1e-3
-BATCH_SIZE = 16
-MODEL_INPUT_FRAMES = 15
-EPOCHS = 50
-TRAIN_TEST_SPLIT = 0.9
-TRAIN_VAL_SPLIT = 0.8
-SEED = 0
-SOURCE_FOLDER = "data\\"
-INFERENCE_TARGET = "f1_right"
-CHECKPOINT = "epoch50_20230503T15-05-00.pth"
-NUMBER_OF_CLASSES = len(StrokeRecognitionDataset().classes)
-
-# Argument Parser
-parser = argparse.ArgumentParser(description='main')
-parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
-parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
-parser.add_argument('--inference', action='store_true', help='Inference Mode.')
-parser.add_argument('--checkpoint', default=f'checkpoint/{CHECKPOINT}', help='Stroke Recognition Model Weight.')
-parser.add_argument('--keypoints', default=f'input/cropped_{INFERENCE_TARGET}.npz', help='Human Pose Estimation Keypoints.')
-parser.add_argument('--gt', default=f'annotation/{INFERENCE_TARGET}.csv', help='Stroke Segments Ground Truth.')
-args = parser.parse_args()
-
-
 def init_seed(seed):
 
     random.seed(seed)
@@ -369,6 +344,31 @@ def predVisualize(TIMESTAMP, filepath, pred_mask, keypoints_2d):
     cap.release()
     output.release()
     progression_bar.close()
+
+
+# Define training hyperparameters
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+INIT_LR = 1e-3
+BATCH_SIZE = 16
+MODEL_INPUT_FRAMES = 15
+EPOCHS = 50
+TRAIN_TEST_SPLIT = 0.9
+TRAIN_VAL_SPLIT = 0.8
+SEED = 0
+SOURCE_FOLDER = "data\\"
+INFERENCE_TARGET = "f1_right"
+CHECKPOINT = "epoch50_20230503T15-05-00.pth"
+NUMBER_OF_CLASSES = len(StrokeRecognitionDataset().classes)
+
+# Argument Parser
+parser = argparse.ArgumentParser(description='main')
+parser.add_argument('--log', default="log/run", required=False, type=str, help="Log folder.")
+parser.add_argument('--model', default="cnn", required=False, type=str, help="Model.")
+parser.add_argument('--inference', action='store_true', help='Inference Mode.')
+parser.add_argument('--checkpoint', default=f'checkpoint/{CHECKPOINT}', help='Stroke Recognition Model Weight.')
+parser.add_argument('--keypoints', default=f'input/cropped_{INFERENCE_TARGET}.npz', help='Human Pose Estimation Keypoints.')
+parser.add_argument('--gt', default=f'annotation/{INFERENCE_TARGET}.csv', help='Stroke Segments Ground Truth.')
+args = parser.parse_args()
 
 
 if __name__ == "__main__":

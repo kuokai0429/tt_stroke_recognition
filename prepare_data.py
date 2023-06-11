@@ -18,16 +18,6 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 
 
-# Define training data hyperparameters
-MODEL_INPUT_FRAMES = 15
-
-# Argument Parser
-parser = argparse.ArgumentParser(description='main')
-parser.add_argument('--mode', default="video", required=True, type=str, help="Run Mode.")
-parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
-args = parser.parse_args()
-
-
 def getVideoInfo(filepath):
 
     cap = cv2.VideoCapture(filepath)
@@ -284,6 +274,16 @@ def prepareData_csv_ver1(model_input_frames):
     print(f"Keypoints with Frame: {[(k, v.shape) for k, v in keypoints_frame_all.items()]}")
 
     return train, train_label, keypoints_frame_all, frame_length_all
+
+
+# Define training data hyperparameters
+MODEL_INPUT_FRAMES = 15
+
+# Argument Parser
+parser = argparse.ArgumentParser(description='main')
+parser.add_argument('--mode', default="video", required=True, type=str, help="Run Mode.")
+parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
+args = parser.parse_args()
 
 
 if __name__ == "__main__":

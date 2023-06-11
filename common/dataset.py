@@ -1,4 +1,4 @@
-# 2023.0420.0253 @Brian
+# 2023.0420 @Brian
 
 class StrokeRecognitionDataset:
 
