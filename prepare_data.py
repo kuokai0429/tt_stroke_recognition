@@ -282,8 +282,7 @@ MODEL_INPUT_FRAMES = 15
 # Argument Parser
 parser = argparse.ArgumentParser(description='main')
 parser.add_argument('--mode', default="video", required=True, type=str, help="Run Mode.")
-parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
-args = parser.parse_args()
+args = parser.parse_known_args()[0]
 
 
 if __name__ == "__main__":
@@ -291,6 +290,9 @@ if __name__ == "__main__":
     folder = "data\\"
 
     if args.mode.startswith("video"):
+
+        parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
+        args = parser.parse_args()
 
         # 2d Pose estimation inference and preprocess.
         if args.mode == "video-pose2d":

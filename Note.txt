@@ -2,9 +2,7 @@
 # Prepare Data
 python preapare_data.py --mode annotation
 ( python preapare_data.py --mode annotation-visualize )
-( python prepare_data.py --mode video-convert )
-( python prepare_data.py --mode video-addframe )
-( python prepare_data.py --mode video-crop )
+( python prepare_data.py --mode video-pose3d --videoname sample_video.mp4)
 
 # Train
 python run.py
