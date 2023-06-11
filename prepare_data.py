@@ -23,7 +23,8 @@ MODEL_INPUT_FRAMES = 15
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='main')
-parser.add_argument('--mode', default="video", required=True, type=str, help="Mode.")
+parser.add_argument('--mode', default="video", required=True, type=str, help="Run Mode.")
+parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
 args = parser.parse_args()
 
 
@@ -287,23 +288,25 @@ def prepareData_csv_ver1(model_input_frames):
 
 if __name__ == "__main__":
 
-    folder = "input\\"
+    folder = "data\\"
 
     if args.mode.startswith("video"):
 
         # 2d Pose estimation inference and preprocess.
         if args.mode == "video-pose2d":
-            os.system("python common/pose2d/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir input --image-ext mp4 --input input/myvideos.mp4")
-            os.system("python common/pose2d/prepare_data_2d_custom.py -i input -o input -os myvideos")
+            os.system(f"python common/pose2d/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir common/pose2d/output --image-ext mp4 --input common/pose2d/video/{args.videoname}")
+            os.system(f"python common/pose2d/prepare_data_2d_custom.py -i common/pose2d/output -o common/pose2d/output -os {args.videoname}")
+            print("2D Keypoints output at common/pose2d/output")
 
         # 3d Pose estimation inference.
         elif args.mode == "video-pose3d":
-            os.system("python common/pose3d/vis.py --video sample_video.mp4")
+            os.system(f"python common/pose3d/vis.py --video {args.videoname}")
+            print("3D Keypoints output at common/pose3d/output")
 
         # Video process related.
         else:
 
-            filepath = "f-1.MOV"
+            filepath = "f-1.MOV" or args.videoname
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
             
@@ -327,6 +330,9 @@ if __name__ == "__main__":
         # Prepare Training Data
         # X_All, y_All, kf, tf = prepareData_txt("m1_right", MODEL_INPUT_FRAMES)
         X_All, y_All, kfa, fla = prepareData_csv_ver1(MODEL_INPUT_FRAMES)
+
+        # prepareData_csv_ver2(MODEL_INPUT_FRAMES)
+
         print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
         print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 

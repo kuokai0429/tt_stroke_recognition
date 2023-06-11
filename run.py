@@ -44,7 +44,7 @@ EPOCHS = 50
 TRAIN_TEST_SPLIT = 0.9
 TRAIN_VAL_SPLIT = 0.8
 SEED = 0
-SOURCE_FOLDER = "input\\"
+SOURCE_FOLDER = "data\\"
 INFERENCE_TARGET = "f1_right"
 CHECKPOINT = "epoch50_20230503T15-05-00.pth"
 NUMBER_OF_CLASSES = len(StrokeRecognitionDataset().classes)
@@ -398,7 +398,7 @@ if __name__ == "__main__":
 
             stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
 
-            ## Load human pose estimation keypoints
+            ## Load 2D Human pose estimation keypoints
 
             filename = args.keypoints
             loaded_keypoints_2d = np.load(filename, encoding='latin1', allow_pickle=True)
@@ -407,6 +407,10 @@ if __name__ == "__main__":
             print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
             print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
             keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
+
+            ## Load 3D Human pose estimation keypoints
+
+            
 
             ## Load model weights
 

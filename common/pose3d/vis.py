@@ -71,7 +71,7 @@ def show3Dpose(vals, ax):
     ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
     ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
     ax.set_zlim3d([-RADIUS_Z+zroot, RADIUS_Z+zroot])
-    ax.set_aspect('equal') # works fine in matplotlib==2.2.2
+    ax.set_aspect('auto')
 
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white) 
@@ -133,7 +133,7 @@ def get_pose3D(video_path, output_dir):
     args, _ = argparse.ArgumentParser().parse_known_args()
     args.layers, args.channel, args.d_hid, args.frames = 3, 512, 1024, 351
     args.pad = (args.frames - 1) // 2
-    args.previous_dir = 'checkpoint/pretrained/351'
+    args.previous_dir = 'common/pose3d/checkpoint/pretrained/351'
     args.n_joints, args.out_joints = 17, 17
 
     ## Reload 
@@ -288,9 +288,9 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
-    video_path = './demo/video/' + args.video
+    video_path = './common/pose3d/video/' + args.video
     video_name = video_path.split('/')[-1].split('.')[0]
-    output_dir = './demo/output/' + video_name + '/'
+    output_dir = './common/pose3d/output/' + video_name + '/'
 
     get_pose2D(video_path, output_dir)
     get_pose3D(video_path, output_dir)
