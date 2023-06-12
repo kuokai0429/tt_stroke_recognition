@@ -137,21 +137,21 @@ def showLandmarks(keypoints_frame, total_frames, output_directory, source, side)
         cv2.destroyAllWindows()
 
 
-def prepareData_txt(filename, model_input_frames):
+def prepareData_txt_2d(filename, model_input_frames):
 
     print(f"File: {filename}")
 
     train, train_label, keypoints_frame = [], [], []
     stroke_class =  {"其他": 0, "正手發球": 1, "反手發球": 2, "正手推球": 3, "反手推球": 4, "正手切球": 5, "反手切球":6}
 
-    loaded_keypoints_2d = np.load(f"input/cropped_{filename}.npz", encoding='latin1', allow_pickle=True)
+    loaded_keypoints_2d = np.load(f"data/cropped_nchu_{filename}.npz", encoding='latin1', allow_pickle=True)
     # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
     print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
     print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
     print(f'Number of coordinates: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0][0])}')
     keypoints_2d = dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0]
 
-    with open(f"annotation/{filename}.txt", 'r', encoding= "utf-8") as f:
+    with open(f"annotation/nchu_{filename}.txt", 'r', encoding= "utf-8") as f:
 
         for r1 in f.readlines():
 
@@ -184,7 +184,7 @@ def prepareData_txt(filename, model_input_frames):
     return train, train_label, keypoints_frame, len(keypoints_2d)
 
 
-def prepareData_csv_ver1(model_input_frames):
+def prepareData_csv_2d(model_input_frames):
 
     '''
     <All>:
@@ -203,13 +203,13 @@ def prepareData_csv_ver1(model_input_frames):
 
     for gender, side in [("f", "right"), ("m", "right")]:
   
-        for filepath in sorted(glob.glob(f"annotation/{gender}*{side}.csv"))[:]:
+        for filepath in sorted(glob.glob(f"annotation/nchu_{gender}*{side}.csv"))[:]:
             
             filename = filepath.rsplit('\\')[1].rsplit('.')[0]
             print(f"File path: {filepath} -> {filename}")
             
             keypoints_frame = []
-            loaded_keypoints_2d = np.load(glob.glob(f"input/cropped_{filename}.npz")[0], encoding='latin1', allow_pickle=True)
+            loaded_keypoints_2d = np.load(glob.glob(f"data/cropped_nchu_{filename}.npz")[0], encoding='latin1', allow_pickle=True)
             # print(loaded_keypoints_2d.files, loaded_keypoints_2d['positions_2d'])
             print(f'Number of frames: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0])}')
             print(f'Number of keypoints: {len(dict(enumerate(loaded_keypoints_2d["positions_2d"].flatten()))[0]["myvideos.mp4"]["custom"][0][0])}')
@@ -276,6 +276,113 @@ def prepareData_csv_ver1(model_input_frames):
     return train, train_label, keypoints_frame_all, frame_length_all
 
 
+def prepareData_csv_3d(model_input_frames):
+
+    '''
+    <All>:
+    0 : 其他, 1 : 左正手發球, 2 : 左反手發球, 3 : 左正手回球, 4 : 左反手回球, 
+    5 : 右正手發球, 6 : 右反手發球, 7 : 右正手回球, 8 : 右反手回球
+    
+    <Left>:  
+    0: 其他, 1: 左正手發球, 2: 左反手發球, 3: 左正手回球, 4: 左反手回球
+    
+    <Right>: 
+    0: 其他, 1: 右正手發球, 2: 右反手發球, 3: 右正手回球, 4: 右反手回球
+    '''
+
+    train, train_label, keypoints_frame_all, frame_length_all = [], [], {}, {}
+    stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
+
+    for filename in ["nchu_f1_right", "nchu_m1_right"]:
+  
+        for filepath in sorted(glob.glob(f"annotation/{filename}.csv"))[:]:
+            
+            print(f"File path: {filepath} -> {filename}")
+            
+            keypoints_frame = []
+            loaded_keypoints_3d = np.load(f"common/pose3d/output/{filename}/keypoints_3d_mhformer.npz", encoding='latin1', allow_pickle=True)
+            # print(loaded_keypoints_3d.files, loaded_keypoints_3d['reconstruction'])
+            print(f'Number of frames: {len(loaded_keypoints_3d["reconstruction"])}')
+            print(f'Number of keypoints: {len(loaded_keypoints_3d["reconstruction"][0])}')
+            print(f'Number of coordinates: {len(loaded_keypoints_3d["reconstruction"][0][0])}')
+            keypoints_3d = loaded_keypoints_3d["reconstruction"]
+            df = pd.read_csv(filepath, encoding='utf8')
+
+            for index, row in df.iterrows():
+                
+                start, end, sc = row['start'], row['end'], row['label']
+
+                # Skip the stroke annotation data if (stroke length < model input frames)
+                if (end - start) < model_input_frames: 
+                    continue
+
+                step = (end - start) // model_input_frames
+                extra = (end - start) % model_input_frames
+                # print("frame range:", start, end)
+                # print("(step, extra):", step, extra)
+                # print("total extra data:", end - range(start, end, step)[model_input_frames-1] - 1, end="\n")
+
+                # Preparing train data for stroke classes from 1 ~ 4 
+                for z in range(end - range(start, end, step)[model_input_frames-1]):
+                        
+                        for count, i in enumerate(range(start+z, end, step)):
+
+                            if count == model_input_frames: break
+
+                            keypoints_frame.append([keypoints_3d[i-1], i])
+                            train.append(keypoints_3d[i-1])
+                            
+                        train_label.append([stroke_class[sc]])
+
+                # Preparing train data for stroke class 0 from [window_tail ~ window_center] and [window_center ~ window_head]
+                if (start - model_input_frames < 1) or (end + model_input_frames > len(keypoints_3d)):
+                    continue
+                else:
+                    for x in range(int((model_input_frames - 1) / 2)):
+
+                        # window_tail ~ window_center
+                        for y in range(model_input_frames):
+                            keypoints_frame.append([keypoints_3d[start - model_input_frames + x + y - 1], start - model_input_frames + x + y - 1])
+                            train.append(keypoints_3d[start - model_input_frames + x + y - 1])
+                        train_label.append([stroke_class["其他"]])
+
+                        # window_center ~ window_head
+                        for y in range(model_input_frames):
+                            keypoints_frame.append([keypoints_3d[end + model_input_frames + x + y - 1], end + model_input_frames + x + y - 1])
+                            train.append(keypoints_3d[end + model_input_frames + x + y - 1])
+                        train_label.append([stroke_class["其他"]])
+
+            print(f'Number of Train features/labels: {len(train)}/{len(train_label)}')
+            keypoints_frame_all[filename] = np.asarray(keypoints_frame, dtype=object)
+            frame_length_all[filename] = len(keypoints_3d)
+
+    train = np.asarray(train).reshape(-1, 17 * model_input_frames, 3)
+    train_label = np.asarray(train_label).reshape(-1, 1)
+
+    # print(train, train_label, keypoints_frame_all)
+    print(f"Train Features Shape: {train.shape}")
+    print(f"Train Label Shape: {train_label.shape}")
+    print(f"Keypoints with Frame: {[(k, v.shape) for k, v in keypoints_frame_all.items()]}")
+
+    return train, train_label, keypoints_frame_all, frame_length_all
+
+
+def exportData(X_All, y_All, datatype):
+
+    coord = 2 if datatype == "2D" else 3
+
+    # Convert Training Data to Pytorch Tensor
+    X_All = torch.FloatTensor(X_All).view(-1, 1, MODEL_INPUT_FRAMES * 17 * coord)
+    y_All = torch.LongTensor(y_All).view(-1)
+    print(type(X_All), type(y_All))
+    print(X_All.shape, y_All.shape)
+
+    # Save Traing Data to pickle
+    for k, v in [('X_All', X_All), ('y_All', y_All)]:
+        with open(f'{folder}{datatype}_{k}.pkl', 'wb') as f:
+            pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
 # Define training data hyperparameters
 MODEL_INPUT_FRAMES = 15
 
@@ -302,7 +409,7 @@ if __name__ == "__main__":
 
         # 3d Pose estimation inference.
         elif args.mode == "video-pose3d":
-            os.system(f"python common/pose3d/vis.py --video {args.videoname}")
+            os.system(f"python common/pose3d/vis_longframes.py --video {args.videoname}")
             print("3D Keypoints output at common/pose3d/output")
 
         # Video process related.
@@ -329,27 +436,34 @@ if __name__ == "__main__":
 
     elif args.mode.startswith("annotation"):
 
-        # Prepare Training Data
-        # X_All, y_All, kf, tf = prepareData_txt("m1_right", MODEL_INPUT_FRAMES)
-        X_All, y_All, kfa, fla = prepareData_csv_ver1(MODEL_INPUT_FRAMES)
+        ## Prepare 2D Training Data
+        if args.mode == "annotation-2d":
+            
+            # X_All, y_All, kf, tf = prepareData_txt_2d("m1_right", MODEL_INPUT_FRAMES)
+            X_All, y_All, kfa, fla = prepareData_csv_2d(MODEL_INPUT_FRAMES)
 
-        # prepareData_csv_ver2(MODEL_INPUT_FRAMES)
+            print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
+            print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
 
-        print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
-        print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
+            exportData(X_All, y_All, "2D")
 
-        # Visualizing annotation keypoints.
-        if args.mode.startswith("annotation-visualize"):
-            src = args.mode.rsplit('-')[-1]
-            showLandmarks(kfa[f'{src}_right'], fla[f'{src}_right'], folder, src, "right")
+            # Visualizing 2D Annotation keypoints
+            if args.visualize == True:
 
-        # Convert Training Data to Pytorch Tensor
-        X_All = torch.FloatTensor(X_All).view(-1, 1, MODEL_INPUT_FRAMES * 17 * 2)
-        y_All = torch.LongTensor(y_All).view(-1)
-        print(type(X_All), type(y_All))
-        print(X_All.shape, y_All.shape)
+                parser.add_argument('--vis_target', required=True, default="nchu_f1_right", type=str, help="Annotation Visualization Target.")
+                args = parser.parse_args()
 
-        # Save Traing Data to pickle
-        for k, v in [('X_All', X_All), ('y_All', y_All)]:
-            with open(f'{folder}{k}.pkl', 'wb') as f:
-                pickle.dump(v, f, protocol=pickle.HIGHEST_PROTOCOL)
+                showLandmarks(kfa[f'{args.vis_target}'], fla[f'{args.vis_target}'], folder, args.vis_target, "right")
+
+        ## Prepare 3D Training Data
+        elif args.mode == "annotation-3d":
+
+            X_All, y_All, kfa, fla = prepareData_csv_3d(MODEL_INPUT_FRAMES)
+
+            print(f"Type of X_All, y_All: {type(X_All)}, {type(y_All)}")
+            print(f"Shape of X_All, y_All: {X_All.shape}, {y_All.shape}")
+
+            exportData(X_All, y_All, "3D")
+            
+
+        

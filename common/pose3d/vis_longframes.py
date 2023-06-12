@@ -71,7 +71,7 @@ def show3Dpose(vals, ax):
     ax.set_xlim3d([-RADIUS+xroot, RADIUS+xroot])
     ax.set_ylim3d([-RADIUS+yroot, RADIUS+yroot])
     ax.set_zlim3d([-RADIUS_Z+zroot, RADIUS_Z+zroot])
-    ax.set_aspect('equal') # works fine in matplotlib==2.2.2
+    ax.set_aspect('auto')
 
     white = (1.0, 1.0, 1.0, 0.0)
     ax.xaxis.set_pane_color(white) 
@@ -242,7 +242,7 @@ def merge_2D3D_plots(video_path, output_dir, startframe, demo_length):
     endframe = video_length if (startframe + demo_length) > video_length else (startframe + demo_length)
 
     print(f"Total Video Length: {video_length}")
-    print(f"{demo_length} frames merged... starting from {startframe} frame.")
+    print(f"{demo_length} frames merged... starting from frame {startframe}.")
 
     for i in tqdm(range(startframe, endframe)):
 
