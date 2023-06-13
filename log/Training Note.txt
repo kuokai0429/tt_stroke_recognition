@@ -1,1 +1,0 @@
-C:\Users\user\Desktop\stroke_recognition\log\run_20230503T15-05-00 : CNN_SR. (BATCH_SIZE=16).

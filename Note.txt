@@ -1,3 +1,4 @@
+<Stroke Recognition 操作指令>
 
 # Prepare Data
 python preapare_data.py --mode annotation-3d
