@@ -256,6 +256,19 @@ def classify_frames(keypoints, datatype):
     return pred_result
 
 
+def majority_filter_1d(pred_result, width):
+
+    offset = width // 2
+    pred_result = [0] * offset + list(pred_result)
+
+    result = []
+    for i in range(len(pred_result) - offset):
+        a = pred_result[i:i+width]
+        result.append(max(set(a), key=a.count))
+
+    return result
+
+
 def prepare_gt_segmts(keypoints, ground_truth_filepath):
 
     ground_truth = [0] * (len(keypoints) + 1)
@@ -566,11 +579,12 @@ if __name__ == "__main__":
         parser.add_argument('--checkpoint', type=str, required=True, help='Stroke Recognition Model Weight.')
         args = parser.parse_args()
 
+        assert os.path.exists(args.checkpoint), "Stroke recognition classifier checkpoint file doesn't exist!"
+
         video2d_filepath = f"data/cropped_{args.inference_target}.mp4"
         video3d_filepath = f"common/pose3d/video/{args.inference_target}.mp4"
         keypoints2d_filepath = f'data/cropped_{args.inference_target}.npz'
         keypoints3d_filepath = f"common/pose3d/output/{args.inference_target}/keypoints_3d_mhformer.npz"
-        ground_truth_filepath = f"annotation/{args.inference_target}.csv"
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
 
@@ -578,6 +592,11 @@ if __name__ == "__main__":
         if args.mode == "inference2d":
 
             print("Inference 2D Model: ")
+
+            ## Check if file exists
+
+            assert os.path.exists(video2d_filepath), "2D video file doesn't exist!"
+            assert os.path.exists(keypoints2d_filepath), "2D keypoints file doesn't exist!"
 
             ## Configurations
 
@@ -605,6 +624,11 @@ if __name__ == "__main__":
 
             print("Inference 3D Model: ")
 
+            ## Check if file exists
+
+            assert os.path.exists(video3d_filepath), "3D video file doesn't exist!"
+            assert os.path.exists(keypoints3d_filepath), "3D keypoints file doesn't exist!"
+
             ## Configurations
 
             video_filepath = video3d_filepath
@@ -628,26 +652,34 @@ if __name__ == "__main__":
 
 
         ## Classifying stroke classes on each frame with different window stride (mid frame of window).
+
         print("[INFO] Classifying stroke classes on each frame....")
         pred_result = classify_frames(keypoints, datatype)
+        pred_result = majority_filter_1d(pred_result, 30)
 
         ## Show the predicted segments in video
+
         print("[INFO] Saving predicted segments to video....")
         visualize_pred(TIMESTAMP[:-1], video_filepath, pred_result, keypoints, datatype)
 
+
         if args.inference_with_gt:
 
-            ## Prepare Ground Truth Segments
+            # Read Ground Truth Filepath
+            ground_truth_filepath = f"annotation/{args.inference_target}.csv"
+            assert os.path.exists(ground_truth_filepath), "Stroke ground truth file doesn't exist!"
+
+            # Prepare Ground Truth Segments
             ground_truth = prepare_gt_segmts(keypoints, ground_truth_filepath)
 
-            ## Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
+            # Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
             plot_segmts(ground_truth, pred_result, keypoints)
 
-            ## Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
+            # Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
             print("\n[INFO] Calculating the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments....")
             eval_1(ground_truth, pred_result)
 
-            ## Calculate the TP, FP, FN of Predicted Segments in a stroke-wise way.
+            # Calculate the TP, FP, FN of Predicted Segments in a stroke-wise way.
             print("\n[INFO] Calculating the TP, FP, FN of Predicted Segments in a stroke-wise way....")
             eval_2(ground_truth, pred_result)
 
