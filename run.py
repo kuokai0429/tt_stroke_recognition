@@ -557,6 +557,7 @@ SEED = 0
 SOURCE_FOLDER = "data\\"
 CHECKPOINT = "checkpoint/epoch50_20230503T15-05-00.pth"
 NUMBER_OF_CLASSES = len(StrokeRecognitionDataset().classes)
+TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
 
 # Argument Parser
 parser = argparse.ArgumentParser(description='main')
@@ -571,8 +572,6 @@ if __name__ == "__main__":
     init_seed(SEED)
 
     if args.mode.startswith("inference"):
-
-        TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
 
         parser.add_argument('--inference_target', type=str, required=True, help='Inference Target.')
         parser.add_argument('--inference_with_gt', action="store_true", help='Inference With Ground Truth Label.')
@@ -689,7 +688,6 @@ if __name__ == "__main__":
         ## Tensorboard logging settings
 
         description = "Train!"
-        TIMESTAMP = "{0:%Y%m%dT%H-%M-%S/}".format(datetime.now())
         writer = SummaryWriter(f"{args.log}_{args.mode}_{TIMESTAMP}",)
         writer.add_text('description', description)
         writer.add_text('command', 'python ' + ' '.join(os.sys.argv))
