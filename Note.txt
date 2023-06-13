@@ -2,7 +2,7 @@
 # Prepare Data
 python preapare_data.py --mode annotation-3d
 ( python preapare_data.py --mode annotation-2d --vis_target nchu_f1_right )
-( python prepare_data.py --mode video-pose3d --videoname sample_video.mp4 )
+( python prepare_data.py --mode video-pose3d --videoname sample_video.mp4 --out_video_sf 0 --out_video_dl 1000 --pose3d_rotation 0 0 0 )
 
 # Train
 python run.py --mode train3d

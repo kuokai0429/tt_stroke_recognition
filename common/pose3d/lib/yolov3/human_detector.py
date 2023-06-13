@@ -73,7 +73,13 @@ def arg_parse():
                         help='The input video path')
     parser.add_argument('-np', '--num-person', type=int, default=1, help='number of estimated human poses. [1, 2]')
     parser.add_argument('--gpu', type=str, default='0', help='input video')
-    
+
+    #######################################
+    parser.add_argument('--out_video_sf', type=int, default=0, help='Output demo start frame.')
+    parser.add_argument('--out_video_dl', type=int, default=1000, help='Output demo length.')
+    parser.add_argument('--pose3d_rotation', required=True, nargs="+", type=int, help='Output 3D pose rotation z, y, x axes.')
+    #######################################
+
     return parser.parse_args()
 
 

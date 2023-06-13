@@ -12,6 +12,7 @@ import glob
 from tqdm import tqdm
 import copy
 from IPython import embed
+from scipy.spatial.transform import Rotation as R
 
 sys.path.append(os.getcwd())
 from model.mhformer import Model_Paper
@@ -110,7 +111,7 @@ def showimage(ax, img):
     ax.imshow(img)
 
 
-def get_pose3D(video_path, output_dir):
+def get_pose3D(video_path, output_dir, zr, yr, xr):
     args_, _ = argparse.ArgumentParser().parse_known_args()
     args_.layers, args_.channel, args_.d_hid, args_.frames = 3, 512, 1024, 351
     args_.pad = (args_.frames - 1) // 2
@@ -143,8 +144,9 @@ def get_pose3D(video_path, output_dir):
 
     ## 3D
     print('\nGenerating 3D pose...')
+    print(f"Rotation (z, y, x) axes: ({zr}, {yr}, {xr}) degree.")
     keypoints_3d = []
-    for i in tqdm(range(video_length)):
+    for i in tqdm(range(video_length)[:]):
         ret, img = cap.read()
         img_size = img.shape
 
@@ -192,9 +194,29 @@ def get_pose3D(video_path, output_dir):
         output_3D[:, :, 0, :] = 0
         post_out = output_3D[0, 0].cpu().detach().numpy()
 
-        rot =  [0.1407056450843811, -0.1500701755285263, -0.755240797996521, 0.6223280429840088]
+        # Camera rotate to video front position
+        rot =  [0.1407056450843811, -0.1500701755285263, -0.755240797996521, 0.6223280429840088] # [cos(θ/2), x*sin(θ/2), y*sin(θ/2), z*sin(θ/2)] Quaternion rotation vector.
         rot = np.array(rot, dtype='float32')
         post_out = camera_to_world(post_out, R=rot, t=0)
+
+        # Camera rotate z-axis clockwise
+        z_rotate = zr
+        rot = R.from_rotvec(np.array([2 * np.pi/2 + z_rotate/90 * np.pi/2, 0, 0])).as_quat()
+        rot = np.array(rot, dtype='float32')
+        post_out = camera_to_world(post_out, R=rot, t=0)
+
+        # Camera rotate y-axis clockwise
+        y_rotate = yr
+        rot = R.from_rotvec(np.array([0, y_rotate/90 * np.pi/2, 0])).as_quat()
+        rot = np.array(rot, dtype='float32')
+        post_out = camera_to_world(post_out, R=rot, t=0)
+
+        # Camera rotate x-axis clockwise
+        x_rotate = xr
+        rot = R.from_rotvec(np.array([0, 0, x_rotate/90 * np.pi/2])).as_quat()
+        rot = np.array(rot, dtype='float32')
+        post_out = camera_to_world(post_out, R=rot, t=0)
+
         post_out[:, 2] -= np.min(post_out[:, 2])
         keypoints_3d.append(post_out)
 
@@ -307,6 +329,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--video', type=str, required=True, help='Input video')
     parser.add_argument('--gpu', type=str, default='0', help='GPU')
+    parser.add_argument('--out_video_sf', type=int, default=0, help='Output demo start frame.')
+    parser.add_argument('--out_video_dl', type=int, default=1000, help='Output demo length.')
+    parser.add_argument('--pose3d_rotation', required=True, nargs="+", type=int, help='Output 3D pose rotation z, y, x axes.')
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -314,9 +339,10 @@ if __name__ == "__main__":
     video_path = './common/pose3d/video/' + args.video
     video_name = video_path.split('/')[-1].split('.')[0]
     output_dir = './common/pose3d/output/' + video_name + '/'
-    start_frame, demo_length = 0, 1000
+    start_frame, demo_length = args.out_video_sf, args.out_video_dl
+    z_rotate, y_rotate, x_rotate = tuple(args.pose3d_rotation)
 
     get_pose2D(video_path, output_dir)
-    get_pose3D(video_path, output_dir)
+    get_pose3D(video_path, output_dir, z_rotate, y_rotate, x_rotate)
     merge_2D3D_plots(video_path, output_dir, start_frame, demo_length)
     img2video(video_path, output_dir)

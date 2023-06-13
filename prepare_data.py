@@ -399,7 +399,7 @@ if __name__ == "__main__":
     if args.mode.startswith("video"):
 
         parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
-        args = parser.parse_args()
+        args = parser.parse_known_args()[0]
 
         # 2d Pose estimation inference and preprocess.
         if args.mode == "video-pose2d":
@@ -409,7 +409,13 @@ if __name__ == "__main__":
 
         # 3d Pose estimation inference.
         elif args.mode == "video-pose3d":
-            os.system(f"python common/pose3d/vis_longframes.py --video {args.videoname}")
+
+            parser.add_argument('--out_video_sf', type=int, default=0, help='Output demo start frame.')
+            parser.add_argument('--out_video_dl', type=int, default=1000, help='Output demo length.')
+            parser.add_argument('--pose3d_rotation', required=True, nargs="+", type=int, help='Output 3D pose rotation z, y, x axes.')
+            args = parser.parse_args()
+
+            os.system(f"python common/pose3d/vis_longframes.py --video {args.videoname} --out_video_sf {args.out_video_sf} --out_video_dl {args.out_video_dl} --pose3d_rotation {args.pose3d_rotation[0]} {args.pose3d_rotation[1]} {args.pose3d_rotation[2]}")
             print("3D Keypoints output at common/pose3d/output")
 
         # Video process related.
