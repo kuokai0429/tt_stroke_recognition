@@ -258,6 +258,8 @@ def classify_frames(keypoints, datatype):
 
 def majority_filter_1d(pred_result, width):
 
+    print("\n[INFO] Filtering Class Results with Majority filter.")
+
     offset = width // 2
     pred_result = [0] * offset + list(pred_result)
 
@@ -269,7 +271,66 @@ def majority_filter_1d(pred_result, width):
     return result
 
 
-def prepare_gt_segmts(keypoints, ground_truth_filepath):
+def stroke_class_fusion(pred_result, keypoints):
+
+    print("[INFO] Merge stroke class results...")
+    print("      (This insures that only one stroke class exist between stroke gaps)")
+
+    ## Producing Predicted segments
+
+    pred_segmts, pre_startframe, pre_class, length = [], 1, pred_result[1], 1
+    for i in range(2, len(keypoints) + 1)[:]:
+
+        if pred_result[i] == pre_class:
+            length += 1
+        else:
+            # print((pre_startframe, length))
+            pred_segmts.append({"seg": (pre_startframe, length), "pred_class": pre_class})
+            pre_startframe, length = i, 1
+
+        pre_class = pred_result[i]
+
+    # print((pre_startframe, length))
+    pred_segmts.append({"seg": (pre_startframe, length), "pred_class": pre_class})
+
+    # print(f"pred_segmts length: {len(pred_segmts)}")
+    # print(f"pred_segmts: {pred_segmts}")
+
+    ## Fusing Stroke classes between stroke gaps.
+
+    pred_segmts_class = np.array([pred_segmts[x]['pred_class'] for x in range(len(pred_segmts))])
+    gaps = np.where(pred_segmts_class == 0)[0].tolist()
+    gaps.append(len(pred_segmts))
+
+    # print(pred_segmts_class)
+    # print(gaps)
+
+    for i in range(len(gaps)-1):
+        stroke_class_counter =  [0] * 5
+
+        for k in range(gaps[i]+1, gaps[i+1]):
+            stroke_class_counter[pred_segmts[k]['pred_class']] += pred_segmts[k]['seg'][1]
+
+        majority_class = stroke_class_counter.index(max(stroke_class_counter))
+        # print(stroke_class_counter)
+        # print(majority_class)
+
+        for k in range(gaps[i]+1, gaps[i+1]):
+            pred_segmts[k]['pred_class'] = majority_class
+
+    result = [0]
+    for i in range(len(pred_segmts)):
+        for j in range(pred_segmts[i]['seg'][1]):
+            result.append(pred_segmts[i]['pred_class'])
+
+    # print(len(result), len(pred_result))
+
+    return result
+
+
+def prepare_gt(keypoints, ground_truth_filepath):
+
+    ## Preparing Frame-wise ground truth results
 
     ground_truth = [0] * (len(keypoints) + 1)
     df = pd.read_csv(ground_truth_filepath, encoding='utf8')
@@ -292,6 +353,8 @@ def plot_segmts(ground_truth, pred_result, keypoints):
     '''
     Note: Short predicted segments won't show up in the barh plots.
     '''
+
+    ## Producing Ground Truth segments and Predicted segments
 
     stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
     facecolors_stroke_class = {0: 'tab:grey', 1: 'tab:blue', 2: 'tab:green', 3: 'tab:red', 4: 'tab:orange'}
@@ -323,6 +386,9 @@ def plot_segmts(ground_truth, pred_result, keypoints):
     print(f"gt_facecolors length: {len(gt_facecolors)}")
     print(f"pred_barh length: {len(pred_barh)}")
     print(f"pred_facecolors length: {len(pred_facecolors)}", end="\n\n")
+
+    
+    ## Plotting Result segments
 
     fontManager.addfont('data/TaipeiSansTCBeta-Regular.ttf')
     plt.rc('font', family='Taipei Sans TC Beta')
@@ -388,11 +454,11 @@ def visualize_pred(TIMESTAMP, filepath, pred_mask, keypoints, datatype):
 
 def eval_1(ground_truth, pred_result):
 
-    # Insure that each class has one prediction for confusion_matrix() and classification_report().
+    ## Insure that each class has one prediction for confusion_matrix() and classification_report().
     ground_truth = np.append(ground_truth, [0, 1, 2, 3, 4])
     pred_result = np.append(pred_result, [0, 1, 2, 3, 4])
 
-    # Confusion Matrix
+    ## Confusion Matrix
     cm = confusion_matrix(ground_truth, pred_result)
     svm = sns.heatmap(cm, annot=True, cmap='Blues', fmt='g')
     figure = svm.get_figure()   
@@ -411,10 +477,10 @@ def eval_1(ground_truth, pred_result):
     # plt.show() 
     figure.savefig(f'output/cm_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}.png', dpi=400)
     
-    # The IoU for class c, IoUc = cm(c, c) / sum(col(c)) + sum(row(c)) - cm(c, c)
+    ## The IoU for class c, IoUc = cm(c, c) / sum(col(c)) + sum(row(c)) - cm(c, c)
     IoUc = [(cm[c][c] / (cm.sum(axis=0)[c] + cm.sum(axis=1)[c] - cm[c][c])) for c in range(NUMBER_OF_CLASSES)]
 
-    # The mean IoU 
+    ## The mean IoU 
     mIoU = sum(IoUc) / NUMBER_OF_CLASSES
 
     print(f"Confusion Matrix:\n{cm}")
@@ -422,14 +488,14 @@ def eval_1(ground_truth, pred_result):
     print(f"IoU for class c (IoUc): {IoUc}")
     print(f"The mean IoU (mIoU): {mIoU}")
 
-    # Remove the patches of [0, 1, 2, 3, 4].
+    ## Remove the patches of [0, 1, 2, 3, 4].
     ground_truth = ground_truth[:-5]
     pred_result = pred_result[:-5]
 
 
 def eval_2(ground_truth, pred_result):
 
-    # Only for testing. 
+    ## Only for testing. 
     # ground_truth = np.array([0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 3, 3, 3, 3, 1, 1, 0, 0, 2, 2, 2, 0, 0, 0, 0])
     # pred_result =  np.array([0, 0, 0, 1, 1, 0, 0, 0, 3, 3, 3, 4, 4, 3, 3, 1, 1, 0, 2, 1, 2, 0, 0, 0, 0])
     # ground_truth = ground_truth[:2000]
@@ -441,12 +507,12 @@ def eval_2(ground_truth, pred_result):
     gt_class_segments = {0: [], 1: [], 2: [], 3: [], 4: []}
     pred_class_segments = {0: [], 1: [], 2: [], 3: [], 4: []}
 
-    # Split multi-class segments into single-class segments.
+    ## Split multi-class segments into single-class segments.
     for c in range(NUMBER_OF_CLASSES):
         gt_class_mask[c] = np.array([1 if ground_truth[i] == c else 0 for i in range(len(ground_truth))])
         pred_class_mask[c] = np.array([1 if pred_result[i] == c else 0 for i in range(len(pred_result))])
 
-    # Find the range of each single-class segments.
+    ## Find the range of each single-class segments.
     for c in range(NUMBER_OF_CLASSES)[:]:
 
         # print(f"\nClass: {c}")
@@ -480,7 +546,7 @@ def eval_2(ground_truth, pred_result):
         print(f"pred_class_segments[{c}] length({len(pred_class_segments[c])}): {pred_class_segments[c]}")
 
     
-    # Count the stroke-wise TP, FN of each class
+    ## Count the stroke-wise TP, FN of each class
 
     # print("\nStroke-wise TP, FN of each class: ")
     tp_c, fn_c = [0] * NUMBER_OF_CLASSES, [0] * NUMBER_OF_CLASSES
@@ -509,7 +575,7 @@ def eval_2(ground_truth, pred_result):
         fn_c[c] = fn_c_temp
 
 
-    # Count the stroke-wise FP of each class
+    ## Count the stroke-wise FP of each class
 
     # print("\nStroke-wise FP of each class: ")
     fp_c = [0] * NUMBER_OF_CLASSES
@@ -586,7 +652,7 @@ if __name__ == "__main__":
         keypoints3d_filepath = f"common/pose3d/output/{args.inference_target}/keypoints_3d_mhformer.npz"
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
-
+        
 
         if args.mode == "inference2d":
 
@@ -654,9 +720,15 @@ if __name__ == "__main__":
 
         print("[INFO] Classifying stroke classes on each frame....")
         pred_result = classify_frames(keypoints, datatype)
-        pred_result = majority_filter_1d(pred_result, 30)
 
-        ## Show the predicted segments in video
+
+        ## Post classification processing
+
+        pred_result = majority_filter_1d(pred_result, 30)
+        pred_result = stroke_class_fusion(pred_result, keypoints)
+
+        
+        ## Show the Predicted Result in video
 
         print("[INFO] Saving predicted segments to video....")
         visualize_pred(TIMESTAMP[:-1], video_filepath, pred_result, keypoints, datatype)
@@ -668,20 +740,20 @@ if __name__ == "__main__":
             ground_truth_filepath = f"annotation/{args.inference_target}.csv"
             assert os.path.exists(ground_truth_filepath), "Stroke ground truth file doesn't exist!"
 
-            # Prepare Ground Truth Segments
-            ground_truth = prepare_gt_segmts(keypoints, ground_truth_filepath)
+            # Prepare Ground Truth Result
+            ground_truth = prepare_gt(keypoints, ground_truth_filepath)
 
-            # Plot the predicted segments compared with the ground-truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
+            # Plot the Predicted segments compared with the Ground Truth segments (https://matplotlib.org/devdocs/gallery/lines_bars_and_markers/broken_barh.html)
             plot_segmts(ground_truth, pred_result, keypoints)
 
-            # Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
+            # Calculate the Confusion Matrix, IoU and DICE of Ground Truth and Predicted result. (https://github.com/qubvel/segmentation_models.pytorch/issues/278)
             print("\n[INFO] Calculating the Confusion Matrix, IoU and DICE of Ground Truth and Predicted Segments....")
             eval_1(ground_truth, pred_result)
 
-            # Calculate the TP, FP, FN of Predicted Segments in a stroke-wise way.
+            # Calculate the TP, FP, FN of Predicted result in a stroke-wise way.
             print("\n[INFO] Calculating the TP, FP, FN of Predicted Segments in a stroke-wise way....")
             eval_2(ground_truth, pred_result)
-
+    
 
     elif args.mode.startswith("train"):
 
