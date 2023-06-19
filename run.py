@@ -409,7 +409,7 @@ def plot_segmts(ground_truth, pred_result, keypoints):
         mpatches.Patch(color='red', label="右正手回球"),
         mpatches.Patch(color='orange', label="右反手回球")]
     plt.legend(handles=h, bbox_to_anchor =(1.10, 0.63))
-    plt.savefig(f"output/ts_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}")                                
+    plt.savefig(f"output/{TIMESTAMP}/ts_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}")                                
     # plt.show()
     plt.clf()
 
@@ -417,7 +417,7 @@ def plot_segmts(ground_truth, pred_result, keypoints):
 def visualize_pred(TIMESTAMP, filepath, pred_mask, keypoints, datatype):
 
     cap = cv2.VideoCapture(filepath)
-    output = cv2.VideoWriter(f'output/predictions_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP}.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
+    output = cv2.VideoWriter(f'output/{TIMESTAMP}/predictions_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP}.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 
                 float(30), (int(cap.get(3)), int(cap.get(4))))
     
     classes = ['None', 'Forehand Serve', 'Backhand Serve', 'Forehand Push', 'Backhand Push']
@@ -475,7 +475,7 @@ def eval_1(ground_truth, pred_result):
         mpatches.Patch(color='orange', label="4: 右反手回球")]
     plt.legend(handles=h, bbox_to_anchor =(1.4, 1))
     # plt.show() 
-    figure.savefig(f'output/cm_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}.png', dpi=400)
+    figure.savefig(f'output/{TIMESTAMP}/cm_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}.png', dpi=400)
     
     ## The IoU for class c, IoUc = cm(c, c) / sum(col(c)) + sum(row(c)) - cm(c, c)
     IoUc = [(cm[c][c] / (cm.sum(axis=0)[c] + cm.sum(axis=1)[c] - cm[c][c])) for c in range(NUMBER_OF_CLASSES)]
@@ -611,6 +611,14 @@ def eval_2(ground_truth, pred_result):
     print(f"F1-Score_C: {f1score_c}")
 
 
+    with open(f'output/{TIMESTAMP}/eval_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}.txt', 'w') as f:
+        
+        f.writelines(f"TP_C: {tp_c}, FN_C: {fn_c}, FP_C: {fp_c}")
+        f.writelines(f"Precision_C: {precision_c}")
+        f.writelines(f"Recall_C: {recall_c}")
+        f.writelines(f"F1-Score_C: {f1score_c}")
+
+
 # Define training hyperparameters
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 INIT_LR = 1e-3
@@ -652,6 +660,8 @@ if __name__ == "__main__":
         keypoints3d_filepath = f"common/pose3d/output/{args.inference_target}/keypoints_3d_mhformer.npz"
 
         stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
+
+        os.makedirs(f"output/{TIMESTAMP}")
         
 
         if args.mode == "inference2d":
