@@ -1,14 +1,16 @@
 <Stroke Recognition 操作指令>
 
 # Prepare Data
-python preapare_data.py --mode annotation-3d
-( python preapare_data.py --mode annotation-2d --vis_target nchu_f1_right )
-( python prepare_data.py --mode video-pose3d --videoname sample_video.mp4 --out_video_sf 0 --out_video_dl 1000 --pose3d_rotation 0 0 0 )
+python prepare_data.py --mode annotation-3d
+( python prepare_data.py --mode annotation-2d --vis_target nchu_f1_right )
+( python prepare_data.py --mode video-pose3d --video sample_video.mp4 --out_video_sf 0 --out_video_dl 1000 --pose3d_rotation 0 0 0 )
+( python prepare_data.py --mode video-addframe --video nchu_m6_right.mp4 )
+( python prepare_data.py --mode video-crop --video nchu_m6_right.mp4 )
 
 # Train
 python run.py --mode train3d
 ( python run.py --mode train2d )
 
 # Inference
-python run.py --mode inference3d --inference_target nchu_f1_right --inference_with_gt --checkpoint checkpoint/epoch50_train3d_20230613T01-06-40.pth
+python run.py --mode inference3d --inference_target nchu_f1_right --inference_with_gt --checkpoint checkpoint/epoch50_train3d_20230620T15-16-49.pth
 ( python run.py --mode inference2d --inference_target nchu_f1_right --inference_with_gt --checkpoint checkpoint/epoch50_train2d_20230613T01-03-08.pth )

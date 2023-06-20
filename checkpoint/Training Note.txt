@@ -1,0 +1,7 @@
+C:\Users\user\Desktop\tt_stroke_recognition\checkpoint\epoch50_train2d_20230613T01-03-08.pth : CNN_2D_SR training.
+C:\Users\user\Desktop\tt_stroke_recognition\checkpoint\epoch50_train3d_20230613T01-06-40.pth : CNN_3D_SR training. 
+                                                                                               (["nchu_f1_right", "nchu_m1_right"])
+C:\Users\user\Desktop\tt_stroke_recognition\checkpoint\epoch50_train3d_20230620T15-16-49.pth : CNN_3D_SR training. 
+                                                                                               (["nchu_f1_right", "nchu_m1_right", "nchu_m6_right", "nchu_f5_right"])
+C:\Users\user\Desktop\tt_stroke_recognition\checkpoint\epoch50_train3d_20230620T15-25-43.pth : CNN_3D_SR training. 
+                                                                                               (["nchu_f1_right", "nchu_m1_right", "nchu_m6_right"])                                                                                               

@@ -30,7 +30,7 @@ def getVideoInfo(filepath):
 
 def videoFrame(file, folder):
 
-    print("Start adding frame!\n")
+    print("Start adding frame!")
     
     cap = cv2.VideoCapture(f"{folder}{file}.mp4")
     output = cv2.VideoWriter(f'{folder}addframe_{file}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 
@@ -53,7 +53,7 @@ def videoFrame(file, folder):
     cap.release()
     output.release()
 
-    print("Finished!\n")
+    print("Finished!")
 
 
 def videoCrop(filename, folder):
@@ -293,7 +293,7 @@ def prepareData_csv_3d(model_input_frames):
     train, train_label, keypoints_frame_all, frame_length_all = [], [], {}, {}
     stroke_class =  {"其他": 0, "右正手發球": 1, "右反手發球": 2, "右正手回球": 3, "右反手回球": 4}
 
-    for filename in ["nchu_f1_right", "nchu_m1_right"]:
+    for filename in ["nchu_f1_right", "nchu_m1_right", "nchu_m6_right", "nchu_f5_right"]:
   
         for filepath in sorted(glob.glob(f"annotation/{filename}.csv"))[:]:
             
@@ -398,13 +398,13 @@ if __name__ == "__main__":
 
     if args.mode.startswith("video"):
 
-        parser.add_argument('--videoname', required=True, type=str, help="Video Filename.")
+        parser.add_argument('--video', required=True, type=str, help="Video Filename.")
         args = parser.parse_known_args()[0]
 
         # 2d Pose estimation inference and preprocess.
         if args.mode == "video-pose2d":
             os.system(f"python common/pose2d/infer_video_d2.py --cfg COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml --output-dir common/pose2d/output --image-ext mp4 --input common/pose2d/video/{args.videoname}")
-            os.system(f"python common/pose2d/prepare_data_2d_custom.py -i common/pose2d/output -o common/pose2d/output -os {args.videoname}")
+            os.system(f"python common/pose2d/prepare_data_2d_custom.py -i common/pose2d/output -o common/pose2d/output -os {args.video}")
             print("2D Keypoints output at common/pose2d/output")
 
         # 3d Pose estimation inference.
@@ -415,15 +415,15 @@ if __name__ == "__main__":
             parser.add_argument('--pose3d_rotation', required=True, nargs="+", type=int, help='Output 3D pose rotation z, y, x axes.')
             args = parser.parse_args()
 
-            os.system(f"python common/pose3d/vis_longframes.py --video {args.videoname} --out_video_sf {args.out_video_sf} --out_video_dl {args.out_video_dl} --pose3d_rotation {args.pose3d_rotation[0]} {args.pose3d_rotation[1]} {args.pose3d_rotation[2]}")
+            os.system(f"python common/pose3d/vis_longframes.py --video {args.video} --out_video_sf {args.out_video_sf} --out_video_dl {args.out_video_dl} --pose3d_rotation {args.pose3d_rotation[0]} {args.pose3d_rotation[1]} {args.pose3d_rotation[2]}")
             print("3D Keypoints output at common/pose3d/output")
 
         # Video process related.
         else:
 
-            filepath = "f-1.MOV" or args.videoname
+            filepath = args.video
             current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = filepath.rsplit('\\', 1)[1].rsplit('.', 1)[0]
+            filename = filepath.rsplit('.', 1)[0]
             
             # Convert video to mp4
             if args.mode == "video-convert":
