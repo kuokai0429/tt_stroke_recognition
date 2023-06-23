@@ -613,10 +613,10 @@ def eval_2(ground_truth, pred_result):
 
     with open(f'output/{TIMESTAMP}/eval_{args.mode[-2:]}({args.inference_target})_{TIMESTAMP[:-1]}.txt', 'w') as f:
         
-        f.writelines(f"TP_C: {tp_c}, FN_C: {fn_c}, FP_C: {fp_c}")
-        f.writelines(f"Precision_C: {precision_c}")
-        f.writelines(f"Recall_C: {recall_c}")
-        f.writelines(f"F1-Score_C: {f1score_c}")
+        f.writelines(f"TP_C: {tp_c}, FN_C: {fn_c}, FP_C: {fp_c}\n")
+        f.writelines(f"Precision_C: {precision_c}\n")
+        f.writelines(f"Recall_C: {recall_c}\n")
+        f.writelines(f"F1-Score_C: {f1score_c}\n")
 
 
 # Define training hyperparameters
