@@ -61,7 +61,7 @@ python run.py --mode train3d
 
 ## 模型預測 Run Inference
 
-To test on a 
+To inference on a input video with collected pose sequences (2D or 3D).
 
 ```bash
 python run.py --mode inference3d --inference_target nchu_f1_right --inference_with_gt --checkpoint checkpoint/epoch50_train3d_20230620T15-16-49.pth
